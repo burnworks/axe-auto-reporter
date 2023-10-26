@@ -115,25 +115,44 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
     const translations = {
         ja: {
             labrlTitle: 'アクセシビリティレポート',
-            labrlViolations: '問題点',
-            labrlFailureSummary: '問題点の要約',
+            labrlViolations: '試験結果',
+            labrlFailureMessage: '発見された問題点',
             labrlImgAlt: 'ページのスクリーンショット',
             labrlTargetHTML: '対象 HTML',
-            labrlHelpPage: '参考URL',
+            labrlHelpPage: '参考情報',
             labrlNoIssues: '問題点は発見されませんでした！',
+            labrlImpact: '影響度',
+            impactData: {
+                minor: '軽度',
+                moderate: '中程度',
+                serious: '深刻',
+                critical: '重大',
+            },
         },
         en: {
             labrlTitle: 'Accessibility Report',
-            labrlViolations: 'Violations',
-            labrlFailureSummary: 'Failure Summary',
+            labrlViolations: 'Test Result',
+            labrlFailureMessage: 'Failure Message',
             labrlImgAlt: 'Screenshot of the page',
             labrlTargetHTML: 'Target HTML',
-            labrlHelpPage: 'Help URL',
+            labrlHelpPage: 'More Information',
             labrlNoIssues: 'You have (0) automatic issues, nice!',
+            labrlImpact: 'Impact',
+            impactData: {
+                minor: 'Minor',
+                moderate: 'Moderate',
+                serious: 'Serious',
+                critical: 'Critical',
+            },
         }
     };
 
-    const translate = (key) => translations[locale][key];
+    const translate = (key, subkey) => {
+        if (subkey) {
+            return translations[locale][key][subkey];
+        }
+        return translations[locale][key];
+    };
 
     const template = fs.readFileSync('src/template.html', 'utf-8');
 
@@ -162,13 +181,22 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
                         ${violation.nodes.map(node => `
                             <li>
                                 <dl>
-                                    <div>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            ${translate('labrlFailureMessage')}
+                                            <span class="impact">${translate('labrlImpact')} 
+                                                <span class="impactLabel ${node.impact}">${translate('impactData', node.impact)}</span>
+                                            </span>
+                                        </dt>
+                                        <dd>${escapeHtml(node.any[0].message)}</dd>
+                                    </div>
+                                    <div class="targetHTML">
                                         <dt>${translate('labrlTargetHTML')}</dt>
                                         <dd><code>${escapeHtml(node.html)}</code></dd>
                                     </div>
-                                    <div>
-                                        <dt>${translate('labrlFailureSummary')}</dt>
-                                        <dd>${escapeHtml(node.failureSummary)}</dd>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>${escapeHtml(node.target[0])}</code></dd>
                                     </div>
                                 </dl>
                             </li>
