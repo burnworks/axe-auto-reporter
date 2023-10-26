@@ -51,3 +51,9 @@ Attempting to run automated tests on too many URLs may not work properly and has
 
 あまりに多くの URL に対して自動テストを実行しようとするとうまく行かないかもしれませんし、接続先のサーバに過剰な負荷をかけてしまう可能性があります。  
 その場合は `urls.txt` に入れる URL の数を減らすなどしてください。
+
+## Tailwind CSS
+
+Tailwind CSS is used to generate the stylesheet for the HTML template. It does not affect the functionality of the script.
+
+Tailwind CSS は HTML テンプレートのスタイルシートを生成するために使用しています。スクリプトの動作には関係ありません。つまり、本スクリプトを使用するだけであれば Tailwind CSS はインストール不要です。
