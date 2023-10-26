@@ -154,7 +154,7 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
         return translations[locale][key];
     };
 
-    const template = fs.readFileSync('src/template.html', 'utf-8');
+    const template = fs.readFileSync('template/template.html', 'utf-8');
 
     let violationHtml;
     if (results.violations.length === 0) {
