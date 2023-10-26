@@ -1,0 +1,9 @@
+{
+  "name": "axe-auto-reporter.js",
+  "type": "module",
+  "version": "1.0.0",
+  "dependencies": {
+    "@axe-core/puppeteer": "^4.8.1",
+    "puppeteer": "^21.4.1"
+  }
+}
