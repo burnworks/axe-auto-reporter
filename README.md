@@ -43,6 +43,8 @@ The configuration file is config.mjs. You can set the following items:
 | `tags` | `'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'` | Axe-core Tags setting. For more details, please refer to the [Axe Javascript Accessibility API](https://github.com/dequelabs/axe-core/blob/master/doc/API.md#axe-core-tags)
 | `mode` | `pc` | `pc` or `mobile`. If you set the value to `pc`, the defaultViewport for puppeteer will be `width: 1024, height: 768`. If set to `mobile`, it will be `width: 375, height: 812`. |
 
+`config.mjs` に設定が記述されています。必要に応じて変更してください。
+
 ## Caution !
 
 Attempting to run automated tests on too many URLs may not work properly and has the potential to impose excessive load on the destination server. If this happens, please reduce the number of URLs in urls.txt.
