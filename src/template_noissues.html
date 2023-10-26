@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <title>アクセシビリティレポート - https://example.com</title>
+    <link href="../template/styles.css" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <hgroup class="title">
+            <h1>アクセシビリティレポート</h1>
+            <p class="testUrl">
+                <span class="urlLabel">URL:</span>
+                https://example.com
+            </p>
+        </hgroup>
+    </header>
+    <main>
+        <div class="contents">
+            <div class="screenshot">
+                <img src="./sample-image.png" alt="ページのスクリーンショット" />
+            </div>
+            <div class="violation">
+                <div class="violationHeader">
+                    <h2>試験結果</h2>
+                </div>
+
+                <div class="violationBody">
+                    <p class="noIssues">
+                        <span class="icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                        </span>
+                        問題点は発見されませんでした！
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <div>
+            <a href="https://github.com/burnworks/axe-auto-reporter" target="_blank"
+                rel="noopener">axe-auto-reporter</a> by @burnworks
+        </div>
+    </footer>
+</body>
+
+</html>

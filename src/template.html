@@ -1,20 +1,280 @@
 <!DOCTYPE html>
-<html lang="{{LOCALE}}">
+<html lang="ja">
 
 <head>
-    <title>{{PAGE_TITLE}} - {{URL}}</title>
-    <style>
-        /* CSS を後で書く */
-    </style>
+    <title>アクセシビリティレポート - https://example.com</title>
+    <link href="../template/styles.css" rel="stylesheet">
 </head>
 
 <body>
     <header>
-        {{HEADER}}
+        <hgroup class="title">
+            <h1>アクセシビリティレポート</h1>
+            <p class="testUrl">
+                <span class="urlLabel">URL:</span>
+                https://example.com
+            </p>
+        </hgroup>
     </header>
     <main>
-        {{CONTENT}}
+        <div class="contents">
+            <div class="screenshot">
+                <img src="./sample-image.png" alt="ページのスクリーンショット" />
+            </div>
+            <div class="violation">
+                <div class="violationHeader">
+                    <h2>試験結果</h2>
+                </div>
+                <div class="violationBody">
+                    <div class="violationBodyHeader">
+                        <h3>前景色と背景色のコントラストがWCAG 2のAAコントラスト比（最低限）のしきい値を満たすことを確認します</h3>
+                        <div class="helpUrl">
+                            <dl>
+                                <dt>参考情報</dt>
+                                <dd>
+                                    <a href="#" target="_blank" rel="noopener">要素は色のコントラスト比（最低限）の閾値を満たしていなければなりません</a>
+                                </dd>
+                            </dl>
+                        </div>
+                        <div class="tagList">
+                            <ul>
+                                <li><span>cat.color</span></li>
+                                <li><span>wcag2aa</span></li>
+                                <li><span>wcag143</span></li>
+                                <li><span>TTv5</span></li>
+                                <li><span>TT13.c</span></li>
+                                <li><span>EN-301-549</span></li>
+                                <li><span>EN-9.1.4.3</span></li>
+                                <li><span>ACT</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="violationItem">
+                        <ul>
+                            <li>
+                                <dl>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            発見された問題点
+                                            <span class="impact">影響度
+                                                <span class="impactLabel serious">深刻</span>
+                                            </span>
+                                        </dt>
+                                        <dd>要素のコントラスト比が不十分です 2.17（前景色: #76bf98、背景色: #ffffff、フォントサイズ: 13.5pt
+                                            (18px)、フォントの太さ: normal）。コントラスト比4.5:1を必要とします</dd>
+                                    </div>
+                                    <div class="targetHTML">
+                                        <dt>対象 HTML</dt>
+                                        <dd><code>&lt;td class=&quot;Beginner&quot;&gt;Beginner&lt;/td&gt;</code></dd>
+                                    </div>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>div[data-testid=&quot;chocolate-cake&quot;] &gt; .Recipes__card-content &gt; table &gt; tbody &gt; tr:nth-child(3) &gt; .Beginner</code>
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </li>
+                            <li>
+                                <dl>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            発見された問題点
+                                            <span class="impact">影響度
+                                                <span class="impactLabel minor">軽度</span>
+                                            </span>
+                                        </dt>
+                                        <dd>要素のコントラスト比が不十分です 2.17（前景色: #76bf98、背景色: #ffffff、フォントサイズ: 13.5pt
+                                            (18px)、フォントの太さ: normal）。コントラスト比4.5:1を必要とします</dd>
+                                    </div>
+                                    <div class="targetHTML">
+                                        <dt>対象 HTML</dt>
+                                        <dd><code>&lt;td class=&quot;Beginner&quot;&gt;Beginner&lt;/td&gt;</code></dd>
+                                    </div>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>div[data-testid=&quot;moms-spaghetti&quot;] &gt; .Recipes__card-content &gt; table &gt; tbody &gt; tr:nth-child(3) &gt; .Beginner</code>
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </li>
+                            <li>
+                                <dl>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            発見された問題点
+                                            <span class="impact">影響度
+                                                <span class="impactLabel moderate">中程度</span>
+                                            </span>
+                                        </dt>
+                                        <dd>要素のコントラスト比が不十分です 2.17（前景色: #76bf98、背景色: #ffffff、フォントサイズ: 13.5pt
+                                            (18px)、フォントの太さ: normal）。コントラスト比4.5:1を必要とします</dd>
+                                    </div>
+                                    <div class="targetHTML">
+                                        <dt>対象 HTML</dt>
+                                        <dd><code>&lt;td class=&quot;Beginner&quot;&gt;Beginner&lt;/td&gt;</code></dd>
+                                    </div>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>div[data-testid=&quot;grilled-cheese&quot;] &gt; .Recipes__card-content &gt; table &gt; tbody &gt; tr:nth-child(3) &gt; .Beginner</code>
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </li>
+                            <li>
+                                <dl>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            発見された問題点
+                                            <span class="impact">影響度
+                                                <span class="impactLabel serious">深刻</span>
+                                            </span>
+                                        </dt>
+                                        <dd>要素のコントラスト比が不十分です 2.17（前景色: #76bf98、背景色: #ffffff、フォントサイズ: 13.5pt
+                                            (18px)、フォントの太さ: normal）。コントラスト比4.5:1を必要とします</dd>
+                                    </div>
+                                    <div class="targetHTML">
+                                        <dt>対象 HTML</dt>
+                                        <dd><code>&lt;td class=&quot;Beginner&quot;&gt;Beginner&lt;/td&gt;</code></dd>
+                                    </div>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>div[data-testid=&quot;lemon-squares&quot;] &gt; .Recipes__card-content &gt; table &gt; tbody &gt; tr:nth-child(3) &gt; .Beginner</code>
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="violationBody">
+                    <div class="violationBodyHeader">
+                        <h3>&lt;img&gt;要素に代替テキストが存在する、またはnoneまたはpresentationのロールが存在することを確認します</h3>
+                        <div class="helpUrl">
+                            <dl>
+                                <dt>参考情報</dt>
+                                <dd>
+                                    <a href="#" target="_blank" rel="noopener">画像には代替テキストがなければなりません</a>
+                                </dd>
+                            </dl>
+                        </div>
+                        <div class="tagList">
+                            <ul>
+                                <li><span>cat.text-alternatives</span></li>
+                                <li><span>wcag2a</span></li>
+                                <li><span>wcag111</span></li>
+                                <li><span>section508</span></li>
+                                <li><span>section508.22.a</span></li>
+                                <li><span>TTv5</span></li>
+                                <li><span>TT7.a</span></li>
+                                <li><span>TT7.b</span></li>
+                                <li><span>EN-301-549</span></li>
+                                <li><span>EN-9.1.1.1</span></li>
+                                <li><span>ACT</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="violationItem">
+                        <ul>
+                            <li>
+                                <dl>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            発見された問題点
+                                            <span class="impact">影響度
+                                                <span class="impactLabel critical">重大</span>
+                                            </span>
+                                        </dt>
+                                        <dd>要素にalt属性が指定されていません</dd>
+                                    </div>
+                                    <div class="targetHTML">
+                                        <dt>対象 HTML</dt>
+                                        <dd><code>&lt;img src=&quot;/food/cake.png&quot; class=&quot;Recipe__image&quot;&gt;</code>
+                                        </dd>
+                                    </div>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>img[src$=&quot;cake.png&quot;]</code></dd>
+                                    </div>
+                                </dl>
+                            </li>
+                            <li>
+                                <dl>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            発見された問題点
+                                            <span class="impact">影響度
+                                                <span class="impactLabel critical">重大</span>
+                                            </span>
+                                        </dt>
+                                        <dd>要素にalt属性が指定されていません</dd>
+                                    </div>
+                                    <div class="targetHTML">
+                                        <dt>対象 HTML</dt>
+                                        <dd><code>&lt;img src=&quot;/food/spaget.png&quot; class=&quot;Recipe__image&quot;&gt;</code>
+                                        </dd>
+                                    </div>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>img[src$=&quot;spaget.png&quot;]</code></dd>
+                                    </div>
+                                </dl>
+                            </li>
+                            <li>
+                                <dl>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            発見された問題点
+                                            <span class="impact">影響度
+                                                <span class="impactLabel critical">重大</span>
+                                            </span>
+                                        </dt>
+                                        <dd>要素にalt属性が指定されていません</dd>
+                                    </div>
+                                    <div class="targetHTML">
+                                        <dt>対象 HTML</dt>
+                                        <dd><code>&lt;img src=&quot;/food/steak.png&quot; class=&quot;Recipe__image&quot;&gt;</code>
+                                        </dd>
+                                    </div>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>img[src$=&quot;steak.png&quot;]</code></dd>
+                                    </div>
+                                </dl>
+                            </li>
+                            <li>
+                                <dl>
+                                    <div class="failureMessage">
+                                        <dt>
+                                            発見された問題点
+                                            <span class="impact">影響度
+                                                <span class="impactLabel critical">重大</span>
+                                            </span>
+                                        </dt>
+                                        <dd>要素にalt属性が指定されていません</dd>
+                                    </div>
+                                    <div class="targetHTML">
+                                        <dt>対象 HTML</dt>
+                                        <dd><code>&lt;img src=&quot;/food/burger.png&quot; class=&quot;Recipe__image&quot;&gt;</code>
+                                        </dd>
+                                    </div>
+                                    <div class="targetDom">
+                                        <dt>DOM</dt>
+                                        <dd><code>img[src$=&quot;burger.png&quot;]</code></dd>
+                                    </div>
+                                </dl>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
+    <footer>
+        <div>
+            <a href="https://github.com/burnworks/axe-auto-reporter" target="_blank"
+                rel="noopener">axe-auto-reporter</a> by @burnworks
+        </div>
+    </footer>
 </body>
 
 </html>

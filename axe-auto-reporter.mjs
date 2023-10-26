@@ -155,26 +155,36 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
     };
 
     const template = fs.readFileSync('template/template.html', 'utf-8');
+    const cssContent = fs.readFileSync('template/styles.css', 'utf-8');
 
     let violationHtml;
     if (results.violations.length === 0) {
         violationHtml = `
             <div class="violationBody">
-                <p class="noIssues">${translate('labrlNoIssues')}</p>
+                <p class="noIssues">
+                    <span class="icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                    </span>
+                ${translate('labrlNoIssues')}
+                </p>
             </div>
         `;
     } else {
         violationHtml = results.violations.map(violation => `
             <div class="violationBody">
-                <h3>${escapeHtml(violation.description)}</h3>
-                <div class="helpUrl">
-                    <dl>
-                        <dt>${translate('labrlHelpPage')}</dt>
-                        <dd><a href="${violation.helpUrl}" target="_blank" rel="noopener">${escapeHtml(violation.help)}</a></dd>
-                    </dl>
-                </div>
-                <div class="tagList">
-                    <ul>${violation.tags.map(tag => `<li>${escapeHtml(tag)}</li>`).join('')}</ul>
+                <div class="violationBodyHeader">
+                    <h3>${escapeHtml(violation.description)}</h3>
+                    <div class="helpUrl">
+                        <dl>
+                            <dt>${translate('labrlHelpPage')}</dt>
+                            <dd><a href="${violation.helpUrl}" target="_blank" rel="noopener">${escapeHtml(violation.help)}</a></dd>
+                        </dl>
+                    </div>
+                    <div class="tagList">
+                        <ul>${violation.tags.map(tag => `<li><span>${escapeHtml(tag)}</span></li>`).join('')}</ul>
+                    </div>
                 </div>
                 <div class="violationItem">
                     <ul>
@@ -208,6 +218,7 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
     }
 
     return template
+        .replace('{{STYLE}}', `<style>${cssContent}</style>`)
         .replace('{{LOCALE}}', locale)
         .replace('{{PAGE_TITLE}}', translate('labrlTitle'))
         .replace('{{URL}}', escapeHtml(url))

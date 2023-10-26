@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+header {
+    @apply p-6 border-b border-gray-200 bg-gray-50;
+}
+
+.title {
+    @apply flex flex-wrap items-center;
+}
+
+h1 {
+    @apply mr-6 text-base font-bold text-gray-900 sm:text-lg;
+}
+
+.testUrl {
+    @apply flex items-center text-sm truncate;
+}
+
+.contents {
+    @apply grid grid-cols-1 gap-6 px-6 py-12 sm:grid-cols-8;
+}
+
+.screenshot {
+    @apply sm:order-last sm:col-span-2;
+}
+
+.screenshot img {
+    @apply rounded-md;
+}
+
+.violation {
+    @apply sm:col-span-6;
+}
+
+.violationHeader {
+    @apply text-2xl font-bold text-gray-900 lg:text-4xl sm:text-3xl;
+}
+
+.violationBody {
+    @apply mt-10 rounded-md border border-gray-200;
+}
+
+.violationBody+.violationBody {
+    @apply mt-12;
+}
+
+.violationBody h3 {
+    @apply text-lg font-bold text-gray-900 lg:text-2xl sm:text-xl;
+}
+
+.violationBodyHeader {
+    @apply p-6 border-b border-gray-200 bg-amber-50;
+}
+
+.helpUrl {
+    @apply mt-4 pl-6;
+}
+
+.helpUrl dl {
+    @apply flex items-center text-sm;
+}
+
+.helpUrl dt {
+    @apply shrink-0 px-4 py-1 rounded-sm border border-gray-200 bg-white;
+}
+
+.helpUrl dd {
+    @apply px-4 py-1;
+}
+
+.helpUrl dd a {
+    @apply underline hover:text-red-800;
+}
+
+.tagList {
+    @apply mt-4 pl-6;
+}
+
+.tagList ul {
+    @apply flex flex-wrap;
+}
+
+.tagList li {
+    @apply pr-2 pb-2;
+}
+
+.tagList li span {
+    @apply inline-block py-1 px-4 rounded-md bg-sky-700 border border-sky-900 text-white text-sm;
+}
+
+.violationItem {
+    @apply p-6;
+}
+
+.violationItem ul {
+    @apply space-y-12 divide-y divide-gray-200;
+}
+
+.violationItem ul li+li {
+    @apply pt-12;
+}
+
+.violationItem dl {
+    @apply space-y-6;
+}
+
+.violationItem dl>div {
+    @apply space-y-2;
+}
+
+.failureMessage dt {
+    @apply mb-4;
+}
+
+.failureMessage dd {
+    @apply text-base font-bold text-gray-900 sm:text-lg;
+}
+
+.impact {
+    @apply ml-4 inline-block pl-4 rounded-sm bg-gray-100 border border-gray-200 text-sm;
+}
+
+.impactLabel {
+    @apply inline-block ml-4 py-1 px-4 bg-white border-l border-gray-200 font-bold;
+}
+
+.impactLabel.minor {
+    @apply text-sky-800;
+}
+
+.impactLabel.moderate {
+    @apply text-purple-800;
+}
+
+.impactLabel.serious {
+    @apply text-rose-700;
+}
+
+.impactLabel.critical {
+    @apply text-red-700;
+}
+
+.targetHTML,
+.targetDom {
+    @apply pl-6;
+}
+
+.targetHTML code,
+.targetDom code {
+    @apply block bg-gray-800 text-white rounded-md border-gray-900 font-mono py-2 px-4 whitespace-nowrap overflow-auto text-sm;
+}
+
+.noIssues {
+    @apply p-6 flex items-center text-lg font-bold text-green-800 lg:text-2xl sm:text-xl;
+}
+
+.noIssues .icon {
+    @apply shrink-0 mr-4;
+}
+
+.noIssues .icon svg {
+    @apply w-6 h-6 lg:w-10 lg:h-10;
+}
+
+footer {
+    @apply block mt-12 p-6 bg-gray-800 text-gray-200;
+}
+
+footer a {
+    @apply text-gray-200 hover:underline hover:text-white;
+}
