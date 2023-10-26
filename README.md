@@ -16,7 +16,7 @@ npm install
 
 ### Edit `urls.txt`
 
-Please edit urls.txt to create a list of URLs you wish to test. Separate each URL with a newline.
+Please edit `urls.txt` to create a list of URLs you wish to test. Separate each URL with a newline.
 
 ### Run Tests
 
@@ -35,4 +35,4 @@ The configuration file is config.mjs. You can set the following items:
 | `urlList` | `urls.txt` | list of URLs. |
 | `locale` | `ja` | `ja`（日本語） or `en` (English) |
 | `tags` | `'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'` | Axe-core Tags setting. See. [Axe Javascript Accessibility API](https://github.com/dequelabs/axe-core/blob/master/doc/API.md#axe-core-tags)
-| `mode` | `pc` | `pc` or `mobile` | If you set the value to `pc`, the defaultViewport for puppeteer will be `width: 1024, height: 768`. If set to `mobile`, it will be `width: 375, height: 812`. |
+| `mode` | `pc` | `pc` or `mobile`. If you set the value to `pc`, the defaultViewport for puppeteer will be `width: 1024, height: 768`. If set to `mobile`, it will be `width: 375, height: 812`. |
