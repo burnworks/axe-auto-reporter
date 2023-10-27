@@ -261,7 +261,7 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
         .replace('{{CONTENT}}', `
             <div class="contents">
                 <div class="screenshot">
-                    <img src="data:image/png;base64,${screenshotBase64}" alt="${translate('labrlImgAlt')}" />
+                    <img src="data:image/png;base64,${screenshotBase64}" alt="${translate('labrlImgAlt')}">
                 </div>
                 <div class="violation">
                     <div class="violationHeader">
