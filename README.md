@@ -14,11 +14,11 @@ cd axe-auto-reporter
 npm install
 ```
 
-### Edit `urls.txt`
+### Create `urls.txt`
 
-Please edit `urls.txt` to create a list of URLs you wish to test. Separate each URL with a newline.
+Rename `urls.sample.txt` to `urls.txt` and edit it to create a list of URLs you wish to test. Separate each URL with a newline.
 
-`urls.txt` を編集してテストを実行したい URL のリストを作ってください。URL は改行で区切ります。
+`urls.sample.txt` を `urls.txt` にリネームした上で編集し、テストを実行したいURLのリストを作ってください。。URL は改行で区切ります。
 
 ### Run Tests
 
