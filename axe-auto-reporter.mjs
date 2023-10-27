@@ -229,11 +229,11 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
                                     </div>
                                     <div class="targetHTML">
                                         <dt>${translate('labrlTargetHTML')}</dt>
-                                        <dd><code>${escapeHtml(node.html)}</code></dd>
+                                        <dd><code tabindex="0">${escapeHtml(node.html)}</code></dd>
                                     </div>
                                     <div class="targetDom">
                                         <dt>DOM</dt>
-                                        <dd><code>${escapeHtml(node.target[0])}</code></dd>
+                                        <dd><code tabindex="0">${escapeHtml(node.target[0])}</code></dd>
                                     </div>
                                 </dl>
                             </li>
