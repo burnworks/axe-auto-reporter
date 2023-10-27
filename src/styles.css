@@ -55,7 +55,7 @@ h1 {
 }
 
 .helpUrl {
-    @apply mt-4 pl-6;
+    @apply mt-4 pl-8;
 }
 
 .helpUrl dl {
@@ -75,7 +75,7 @@ h1 {
 }
 
 .tagList {
-    @apply mt-4 pl-6;
+    @apply mt-4 pl-8;
 }
 
 .tagList ul {
@@ -94,11 +94,11 @@ h1 {
     @apply p-6;
 }
 
-.violationItem ul {
+.violationItem>ul {
     @apply space-y-12 divide-y divide-gray-200;
 }
 
-.violationItem ul li+li {
+.violationItem>ul>li+li {
     @apply pt-12;
 }
 
@@ -118,6 +118,18 @@ h1 {
     @apply text-base font-bold text-gray-900 sm:text-lg;
 }
 
+.failureList li {
+    @apply flex;
+}
+
+.failureListIcon {
+    @apply shrink-0 mr-2 text-red-700 h-7 flex items-center;
+}
+
+.failureListIcon svg {
+    @apply w-6 h-6;
+}
+
 .impact {
     @apply ml-4 inline-block pl-4 rounded-sm bg-gray-100 border border-gray-200 text-sm;
 }
@@ -135,16 +147,23 @@ h1 {
 }
 
 .impactLabel.serious {
-    @apply text-rose-700;
-}
-
-.impactLabel.critical {
     @apply text-red-700;
 }
 
+.impactLabel.critical {
+    @apply text-red-900;
+}
+
+.failureSummaly,
 .targetHTML,
 .targetDom {
-    @apply pl-6;
+    @apply pl-8;
+}
+
+.failureSummaly dt,
+.targetHTML dt,
+.targetDom dt {
+    @apply font-bold;
 }
 
 .targetHTML code,

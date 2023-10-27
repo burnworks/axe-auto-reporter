@@ -117,6 +117,7 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
             labrlTitle: 'アクセシビリティレポート',
             labrlViolations: '試験結果',
             labrlFailureMessage: '発見された問題点',
+            labrlFailureSummaly: '修正提案',
             labrlImgAlt: 'ページのスクリーンショット',
             labrlTargetHTML: '対象 HTML',
             labrlHelpPage: '参考情報',
@@ -133,6 +134,7 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
             labrlTitle: 'Accessibility Report',
             labrlViolations: 'Test Result',
             labrlFailureMessage: 'Failure Message',
+            labrlFailureSummaly: 'Failure Summary',
             labrlImgAlt: 'Screenshot of the page',
             labrlTargetHTML: 'Target HTML',
             labrlHelpPage: 'More Information',
@@ -198,7 +200,32 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
                                                 <span class="impactLabel ${node.impact}">${translate('impactData', node.impact)}</span>
                                             </span>
                                         </dt>
-                                        <dd>${escapeHtml(node.any[0].message)}</dd>
+                                        <dd class="failureList">
+                                            <ul>
+                                                ${node.any && node.any.length ? node.any.map(anyMessage => `
+                                                    <li>
+                                                        <span class="failureListIcon" aria-hidden="true">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                                                            </svg>
+                                                        </span>
+                                                    ${escapeHtml(anyMessage.message)}</li>
+                                                `).join('') : ''}
+                                                ${node.none && node.none.length ? node.none.map(noneMessage => `
+                                                <li>
+                                                    <span class="failureListIcon" aria-hidden="true">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                                                        </svg>
+                                                    </span>
+                                                ${escapeHtml(noneMessage.message)}</li>
+                                                `).join('') : ''}
+                                            </ul>
+                                        </dd>
+                                    </div>
+                                    <div class="failureSummaly">
+                                        <dt>${translate('labrlFailureSummaly')}</dt>
+                                        <dd>${escapeHtml(node.failureSummary)}</dd>
                                     </div>
                                     <div class="targetHTML">
                                         <dt>${translate('labrlTargetHTML')}</dt>
