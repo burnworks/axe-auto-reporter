@@ -1,7 +1,20 @@
 {
   "name": "axe-auto-reporter.js",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.1.3",
+  "description": "Automated accessibility testing script using @axe-core/puppeteer, outputting results as HTML.",
+  "license": "MIT",
+  "author": "burnworks",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/burnworks/axe-auto-reporter"
+  },
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "a11y-testing",
+    "axe-core"
+  ],
   "dependencies": {
     "@axe-core/puppeteer": "^4.8.1",
     "puppeteer": "^21.4.1"
