@@ -19,11 +19,11 @@ h1 {
 }
 
 .contents {
-    @apply grid grid-cols-1 gap-6 px-6 py-12 sm:grid-cols-8;
+    @apply grid grid-cols-1 gap-6 px-6 py-12 md:grid-cols-8;
 }
 
 .screenshot {
-    @apply sm:order-last sm:col-span-2;
+    @apply md:order-last md:col-span-2;
 }
 
 .screenshot img {
@@ -31,11 +31,79 @@ h1 {
 }
 
 .violation {
-    @apply sm:col-span-6;
+    @apply md:col-span-6;
 }
 
 .violationHeader {
     @apply text-2xl font-bold text-gray-900 lg:text-4xl sm:text-3xl;
+}
+
+.violationSummary {
+    @apply mt-10;
+}
+
+.violationFilter {
+    @apply flex flex-col gap-4 lg:flex-row lg:items-center;
+}
+
+.violationFilter dt {
+    @apply font-bold shrink-0;
+}
+
+.violationFilter ul {
+    @apply flex gap-4 items-center flex-wrap;
+}
+
+.violationFilterBtn {
+    @apply flex items-center overflow-hidden rounded-md border border-gray-700 hover:cursor-pointer;
+}
+
+.violationFilter li:focus-within .violationFilterBtn {
+    @apply outline outline-2 outline-offset-2 outline-blue-700;
+}
+
+.violationFilterBtn.disabled {
+    @apply text-gray-600 bg-gray-200;
+}
+
+.violationFilterBtn.disabled .violationLabel {
+    @apply text-gray-600 bg-gray-200;
+}
+
+.violationFilterBtn.disabled .violationFilterNum {
+    @apply font-normal;
+}
+
+.violationLabel {
+    @apply py-1 px-4 text-white;
+}
+
+.violationLabel.minor {
+    @apply bg-sky-800;
+}
+
+.violationLabel.moderate {
+    @apply bg-purple-800;
+}
+
+.violationLabel.serious {
+    @apply bg-red-700;
+}
+
+.violationLabel.critical {
+    @apply bg-red-900;
+}
+
+.violationFilterNum {
+    @apply py-1 px-4 font-bold;
+}
+
+.violationFilterReset {
+    @apply w-full xl:w-fit xl:ml-6;
+}
+
+.violationFilterResetBtn {
+    @apply inline-block py-1 px-2 overflow-hidden rounded-md border border-gray-400 bg-gray-200 text-sm hover:bg-gray-300 focus:outline-offset-2;
 }
 
 .violationBody {
@@ -79,11 +147,7 @@ h1 {
 }
 
 .tagList ul {
-    @apply flex flex-wrap;
-}
-
-.tagList li {
-    @apply pr-2 pb-2;
+    @apply flex gap-4 flex-wrap;
 }
 
 .tagList li span {
@@ -91,15 +155,15 @@ h1 {
 }
 
 .violationItem {
-    @apply p-6;
+    @apply px-6;
 }
 
 .violationItem>ul {
-    @apply space-y-12 divide-y divide-gray-200;
+    @apply divide-y divide-gray-200;
 }
 
-.violationItem>ul>li+li {
-    @apply pt-12;
+.violationItem>ul>li {
+    @apply py-12;
 }
 
 .violationItem dl {

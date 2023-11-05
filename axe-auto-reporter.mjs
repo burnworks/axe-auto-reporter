@@ -22,8 +22,8 @@ const reportConfigure = () => {
     } else if (config.mode === 'mobile') {
         config.viewport = VIEWPORTS.MOBILE;
     } else {
-        console.error("\x1b[31mInvalid mode specified\x1b[0m");
-        throw new Error("Invalid mode specified");
+        console.error('\x1b[31mInvalid mode specified\x1b[0m');
+        throw new Error('Invalid mode specified');
     }
 
     return config;
@@ -114,52 +114,60 @@ const ensureDirectoryExists = (dir) => {
 const generateHtmlReport = (url, results, screenshotBase64, locale) => {
     const translations = {
         ja: {
-            labrlTitle: 'アクセシビリティレポート',
-            labrlViolations: '試験結果',
-            labrlFailureMessage: '発見された問題点',
-            labrlFailureSummaly: '修正提案',
-            labrlImgAlt: 'ページのスクリーンショット',
-            labrlTargetHTML: '対象 HTML',
-            labrlHelpPage: '参考情報',
-            labrlNoIssues: '問題点は発見されませんでした！',
-            labrlImpact: '影響度',
+            labelTitle: 'アクセシビリティレポート',
+            labelViolations: '試験結果',
+            labelFailureMessage: '発見された問題点',
+            labelFailureSummaly: '修正提案',
+            labelImgAlt: 'ページのスクリーンショット',
+            labelTargetHTML: '対象 HTML',
+            labelHelpPage: '参考情報',
+            labelNoIssues: '問題点は発見されませんでした！',
+            labelImpact: '影響度',
             impactData: {
                 minor: '軽度',
                 moderate: '中程度',
                 serious: '深刻',
                 critical: '重大',
             },
+            labelViolationFilter: '影響度フィルター',
+            labelViolationFilterNote: '（チェックを外すと該当する影響度の問題点が非表示になります）',
+            labelViolationFilterReset: 'フィルターをリセット',
+            labelViolationFilterResetAriaLabel: '影響度フィルターをリセットしてすべての問題点を表示',
         },
         en: {
-            labrlTitle: 'Accessibility Report',
-            labrlViolations: 'Test Result',
-            labrlFailureMessage: 'Failure Message',
-            labrlFailureSummaly: 'Failure Summary',
-            labrlImgAlt: 'Screenshot of the page',
-            labrlTargetHTML: 'Target HTML',
-            labrlHelpPage: 'More Information',
-            labrlNoIssues: 'You have (0) automatic issues, nice!',
-            labrlImpact: 'Impact',
+            labelTitle: 'Accessibility Report',
+            labelViolations: 'Test Result',
+            labelFailureMessage: 'Failure Message',
+            labelFailureSummaly: 'Failure Summary',
+            labelImgAlt: 'Screenshot of the page',
+            labelTargetHTML: 'Target HTML',
+            labelHelpPage: 'More Information',
+            labelNoIssues: 'You have (0) automatic issues, nice!',
+            labelImpact: 'Impact',
             impactData: {
                 minor: 'Minor',
                 moderate: 'Moderate',
                 serious: 'Serious',
                 critical: 'Critical',
             },
+            labelViolationFilter: 'Impact Filter',
+            labelViolationFilterNote: '(Uncheck to hide failures of the corresponding impact level)',
+            labelViolationFilterReset: 'Reset Filter',
+            labelViolationFilterResetAriaLabel: 'Reset the impact filter to display all failures.',
         }
     };
 
     const translate = (key, subkey) => {
-        if (subkey) {
-            return translations[locale][key][subkey];
-        }
-        return translations[locale][key];
+        const keys = translations[locale] || translations.ja;
+        return subkey ? keys[key][subkey] || keys[key] : keys[key] || 'Translation missing';
     };
 
     const template = fs.readFileSync('template/template.html', 'utf-8');
     const cssContent = fs.readFileSync('template/styles.css', 'utf-8');
 
+    let impactListHtml;
     let violationHtml;
+
     if (results.violations.length === 0) {
         violationHtml = `
             <div class="violationBody">
@@ -169,18 +177,45 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                         </svg>
                     </span>
-                ${translate('labrlNoIssues')}
+                ${translate('labelNoIssues')}
                 </p>
             </div>
         `;
     } else {
+        const impactCounts = {
+            minor: 0,
+            moderate: 0,
+            serious: 0,
+            critical: 0
+        };
+
+        for (const violation of results.violations) {
+            for (const node of violation.nodes) {
+                if (impactCounts.hasOwnProperty(node.impact)) {
+                    impactCounts[node.impact]++;
+                }
+            }
+        }
+
+        impactListHtml = Object.entries(impactCounts).map(([impact, count]) => `
+            <li>
+                <span class="sr-only">
+                    <input type="checkbox" name="filter-${impact}" id="filter-${impact}" checked>
+                </span>
+                <label class="violationFilterBtn" for="filter-${impact}">
+                    <span class="violationLabel ${impact}">${translate('impactData', impact)}</span>
+                    <span class="violationFilterNum">${count}</span>
+                </label>
+            </li>
+        `).join('');
+
         violationHtml = results.violations.map(violation => `
             <div class="violationBody">
                 <div class="violationBodyHeader">
                     <h3>${escapeHtml(violation.description)}</h3>
                     <div class="helpUrl">
                         <dl>
-                            <dt>${translate('labrlHelpPage')}</dt>
+                            <dt>${translate('labelHelpPage')}</dt>
                             <dd><a href="${violation.helpUrl}" target="_blank" rel="noopener">${escapeHtml(violation.help)}</a></dd>
                         </dl>
                     </div>
@@ -191,12 +226,12 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
                 <div class="violationItem">
                     <ul>
                         ${violation.nodes.map(node => `
-                            <li>
+                            <li data-impact="${node.impact}">
                                 <dl>
                                     <div class="failureMessage">
                                         <dt>
-                                            ${translate('labrlFailureMessage')}
-                                            <span class="impact">${translate('labrlImpact')} 
+                                            ${translate('labelFailureMessage')}
+                                            <span class="impact">${translate('labelImpact')} 
                                                 <span class="impactLabel ${node.impact}">${translate('impactData', node.impact)}</span>
                                             </span>
                                         </dt>
@@ -224,11 +259,11 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
                                         </dd>
                                     </div>
                                     <div class="failureSummaly">
-                                        <dt>${translate('labrlFailureSummaly')}</dt>
+                                        <dt>${translate('labelFailureSummaly')}</dt>
                                         <dd>${escapeHtml(node.failureSummary)}</dd>
                                     </div>
                                     <div class="targetHTML">
-                                        <dt>${translate('labrlTargetHTML')}</dt>
+                                        <dt>${translate('labelTargetHTML')}</dt>
                                         <dd><code tabindex="0">${escapeHtml(node.html)}</code></dd>
                                     </div>
                                     <div class="targetDom">
@@ -247,11 +282,11 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
     return template
         .replace('{{STYLE}}', `<style>${cssContent}</style>`)
         .replace('{{LOCALE}}', locale)
-        .replace('{{PAGE_TITLE}}', translate('labrlTitle'))
+        .replace('{{PAGE_TITLE}}', translate('labelTitle'))
         .replace('{{URL}}', escapeHtml(url))
         .replace('{{HEADER}}', `
             <hgroup class="title">
-                <h1>${translate('labrlTitle')}</h1>
+                <h1>${translate('labelTitle')}</h1>
                 <p class="testUrl">
                     <span class="urlLabel">URL:</span>
                     ${escapeHtml(url)}
@@ -261,12 +296,32 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
         .replace('{{CONTENT}}', `
             <div class="contents">
                 <div class="screenshot">
-                    <img src="data:image/png;base64,${screenshotBase64}" alt="${translate('labrlImgAlt')}">
+                    <img src="data:image/png;base64,${screenshotBase64}" alt="${translate('labelImgAlt')}">
                 </div>
                 <div class="violation">
                     <div class="violationHeader">
-                        <h2>${translate('labrlViolations')}</h2>
+                        <h2>${translate('labelViolations')}</h2>
                     </div>
+                    ${impactListHtml ? `
+                        <div class="violationSummary">
+                            <dl class="violationFilter">
+                                <dt>
+                                    ${translate('labelViolationFilter')}
+                                    <span class="sr-only">${translate('labelViolationFilterNote')}</span>
+                                </dt>
+                                <dd>
+                                    <ul>
+                                        ${impactListHtml}
+                                        <li class="violationFilterReset">
+                                            <button class="violationFilterResetBtn" id="filter-reset" aria-label="${translate('labelViolationFilterResetAriaLabel')}">
+                                                ${translate('labelViolationFilterReset')}
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </dd>
+                            </dl>
+                        </div>
+                    ` : ''}
                     ${violationHtml}
                 </div>
             </div>
@@ -274,12 +329,12 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
 };
 
 // HTML escape
-const escapeHtml = unsafe => {
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;")
-        .replace(/\n/g, "<br>");
-};
+const escapeHtml = unsafe => (
+    unsafe
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br>')
+);

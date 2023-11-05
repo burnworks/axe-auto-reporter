@@ -27,6 +27,60 @@
                 <div class="violationHeader">
                     <h2>試験結果</h2>
                 </div>
+                <div class="violationSummary">
+                    <dl class="violationFilter">
+                        <dt>
+                            影響度フィルター
+                            <span class="sr-only">（チェックを外すと該当する影響度の問題点が非表示になります）</span>
+                        </dt>
+                        <dd>
+                            <ul>
+                                <li>
+                                    <span class="sr-only">
+                                        <input type="checkbox" name="filter-minor" id="filter-minor" checked>
+                                    </span>
+                                    <label class="violationFilterBtn" for="filter-minor">
+                                        <span class="violationLabel minor">軽度</span>
+                                        <span class="violationFilterNum">1</span>
+                                    </label>
+                                </li>
+                                <li>
+                                    <span class="sr-only">
+                                        <input type="checkbox" name="filter-moderate" id="filter-moderate" checked>
+                                    </span>
+                                    <label class="violationFilterBtn" for="filter-moderate">
+                                        <span class="violationLabel moderate">中程度</span>
+                                        <span class="violationFilterNum">1</span>
+                                    </label>
+                                </li>
+                                <li>
+                                    <span class="sr-only">
+                                        <input type="checkbox" name="filter-serious" id="filter-serious" checked>
+                                    </span>
+                                    <label class="violationFilterBtn" for="filter-serious">
+                                        <span class="violationLabel serious">深刻</span>
+                                        <span class="violationFilterNum">1</span>
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="violationFilterBtn" for="filter-critical">
+                                        <span class="sr-only">
+                                            <input type="checkbox" name="filter-critical" id="filter-critical" checked>
+                                        </span>
+                                        <span class="violationLabel critical">重大</span>
+                                        <span class="violationFilterNum">2</span>
+                                    </label>
+                                </li>
+                                <li class="violationFilterReset">
+                                    <button class="violationFilterResetBtn" id="filter-reset"
+                                        aria-label="影響度フィルターをリセットしてすべての問題点を表示">
+                                        フィルターをリセット
+                                    </button>
+                                </li>
+                            </ul>
+                        </dd>
+                    </dl>
+                </div>
                 <div class="violationBody">
                     <div class="violationBodyHeader">
                         <h3>前景色と背景色のコントラストがWCAG 2のAAコントラスト比（最低限）のしきい値を満たすことを確認します</h3>
@@ -53,7 +107,7 @@
                     </div>
                     <div class="violationItem">
                         <ul>
-                            <li>
+                            <li data-impact="serious">
                                 <dl>
                                     <div class="failureMessage">
                                         <dt>
@@ -97,7 +151,7 @@
                                     </div>
                                 </dl>
                             </li>
-                            <li>
+                            <li data-impact="minor">
                                 <dl>
                                     <div class="failureMessage">
                                         <dt>
@@ -141,7 +195,7 @@
                                     </div>
                                 </dl>
                             </li>
-                            <li>
+                            <li data-impact="moderate">
                                 <dl>
                                     <div class="failureMessage">
                                         <dt>
@@ -217,7 +271,7 @@
                     </div>
                     <div class="violationItem">
                         <ul>
-                            <li>
+                            <li data-impact="critical">
                                 <dl>
                                     <div class="failureMessage">
                                         <dt>
@@ -305,7 +359,7 @@
                                     </div>
                                 </dl>
                             </li>
-                            <li>
+                            <li data-impact="critical">
                                 <dl>
                                     <div class="failureMessage">
                                         <dt>
@@ -401,10 +455,55 @@
     </main>
     <footer>
         <div>
-            <a href="https://github.com/burnworks/axe-auto-reporter" target="_blank"
-                rel="noopener">axe-auto-reporter</a> by @burnworks
+            <a href="https://github.com/burnworks/axe-auto-reporter" target="_blank" rel="noopener">
+                axe-auto-reporter
+            </a>
+            by @burnworks
         </div>
     </footer>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const impactLevels = ['minor', 'moderate', 'serious', 'critical'];
+
+            const updateVisibility = () => {
+                const checkedLevels = impactLevels.filter(level => document.getElementById(`filter-${level}`).checked);
+                document.querySelectorAll('[data-impact]').forEach(element => {
+                    const isImpactChecked = checkedLevels.includes(element.getAttribute('data-impact'));
+                    element.hidden = !isImpactChecked;
+                });
+
+                impactLevels.forEach(impactLevel => {
+                    const checkbox = document.getElementById(`filter-${impactLevel}`);
+                    const label = document.querySelector(`label[for="${checkbox.id}"]`);
+                    if (label) {
+                        label.classList.toggle('disabled', !checkbox.checked);
+                    }
+                });
+            };
+
+            impactLevels.forEach(impactLevel => {
+                const checkbox = document.getElementById(`filter-${impactLevel}`);
+                if (checkbox) {
+                    checkbox.addEventListener('change', updateVisibility);
+                }
+            });
+
+            const resetButton = document.getElementById('filter-reset');
+            if (resetButton) {
+                resetButton.addEventListener('click', () => {
+                    impactLevels.forEach(impactLevel => {
+                        const checkbox = document.getElementById(`filter-${impactLevel}`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                        }
+                    });
+                    updateVisibility();
+                });
+            }
+
+            updateVisibility();
+        });
+    </script>
 </body>
 
 </html>

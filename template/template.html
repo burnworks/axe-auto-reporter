@@ -21,6 +21,49 @@
                 rel="noopener">axe-auto-reporter</a> by @burnworks
         </div>
     </footer>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const impactLevels = ['minor', 'moderate', 'serious', 'critical'];
+
+            const updateVisibility = () => {
+                const checkedLevels = impactLevels.filter(level => document.getElementById(`filter-${level}`).checked);
+                document.querySelectorAll('[data-impact]').forEach(element => {
+                    const isImpactChecked = checkedLevels.includes(element.getAttribute('data-impact'));
+                    element.hidden = !isImpactChecked;
+                });
+
+                impactLevels.forEach(impactLevel => {
+                    const checkbox = document.getElementById(`filter-${impactLevel}`);
+                    const label = document.querySelector(`label[for="${checkbox.id}"]`);
+                    if (label) {
+                        label.classList.toggle('disabled', !checkbox.checked);
+                    }
+                });
+            };
+
+            impactLevels.forEach(impactLevel => {
+                const checkbox = document.getElementById(`filter-${impactLevel}`);
+                if (checkbox) {
+                    checkbox.addEventListener('change', updateVisibility);
+                }
+            });
+
+            const resetButton = document.getElementById('filter-reset');
+            if (resetButton) {
+                resetButton.addEventListener('click', () => {
+                    impactLevels.forEach(impactLevel => {
+                        const checkbox = document.getElementById(`filter-${impactLevel}`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                        }
+                    });
+                    updateVisibility();
+                });
+            }
+
+            updateVisibility();
+        });
+    </script>
 </body>
 
 </html>
