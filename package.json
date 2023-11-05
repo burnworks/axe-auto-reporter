@@ -1,7 +1,7 @@
 {
   "name": "axe-auto-reporter.js",
   "type": "module",
-  "version": "1.1.3",
+  "version": "1.2.0",
   "description": "Automated accessibility testing script using @axe-core/puppeteer, outputting results as HTML.",
   "license": "MIT",
   "author": "burnworks",
