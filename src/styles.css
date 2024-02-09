@@ -6,12 +6,20 @@ header {
     @apply p-6 border-b border-gray-200 bg-gray-50;
 }
 
-.title {
-    @apply flex flex-wrap items-center;
-}
-
 h1 {
     @apply mr-6 text-base font-bold text-gray-900 sm:text-lg;
+}
+
+footer {
+    @apply block mt-12 p-6 bg-gray-800 text-gray-200;
+}
+
+footer a {
+    @apply text-gray-200 hover:underline hover:text-white;
+}
+
+.title {
+    @apply flex flex-wrap items-center;
 }
 
 .testUrl {
@@ -245,12 +253,4 @@ h1 {
 
 .noIssues .icon svg {
     @apply w-6 h-6 lg:w-10 lg:h-10;
-}
-
-footer {
-    @apply block mt-12 p-6 bg-gray-800 text-gray-200;
-}
-
-footer a {
-    @apply text-gray-200 hover:underline hover:text-white;
 }
