@@ -52,6 +52,12 @@ Attempting to run automated tests on too many URLs may not work properly and has
 あまりに多くの URL に対して自動テストを実行しようとするとうまく行かないかもしれませんし、接続先のサーバに過剰な負荷をかけてしまう可能性があります。  
 その場合は `urls.txt` に入れる URL の数を減らすなどしてください。
 
+## Report sample
+
+下記はレポートのサンプル画像です。
+
+![レポートのサンプル画像](./assets/axe-auto-reporter-sample-v1.2.0.png "レポートのサンプル画像")
+
 ## Tailwind CSS
 
 Tailwind CSS is used to generate the stylesheet for the HTML template. It does not affect the functionality of the script.
