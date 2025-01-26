@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer';
 import { loadPage } from '@axe-core/puppeteer';
-import AXELOCALES_JA from 'axe-core/locales/ja.json' assert { type: 'json' };
+import AXELOCALES_JA from 'axe-core/locales/ja.json' with { type: 'json' };
 import fs from 'fs';
 import path from 'path';
 import config from './config.mjs';
@@ -294,7 +294,7 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
             </hgroup>
         `)
         .replace('{{CONTENT}}', `
-            <div class="contents">
+            <div class="main-contents">
                 <div class="screenshot">
                     <img src="data:image/png;base64,${screenshotBase64}" alt="${translate('labelImgAlt')}">
                 </div>

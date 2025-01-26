@@ -1,256 +1,255 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@layer components {
+    header {
+        @apply p-6 border-b border-gray-200 bg-gray-50;
+    }
 
-header {
-    @apply p-6 border-b border-gray-200 bg-gray-50;
-}
+    h1 {
+        @apply mr-6 text-base font-bold text-gray-900 sm:text-lg;
+    }
 
-h1 {
-    @apply mr-6 text-base font-bold text-gray-900 sm:text-lg;
-}
+    footer {
+        @apply block mt-12 p-6 bg-gray-800 text-gray-200;
+    }
 
-footer {
-    @apply block mt-12 p-6 bg-gray-800 text-gray-200;
-}
+    footer a {
+        @apply text-gray-200 hover:underline hover:text-white;
+    }
 
-footer a {
-    @apply text-gray-200 hover:underline hover:text-white;
-}
+    .title {
+        @apply flex flex-wrap items-center;
+    }
 
-.title {
-    @apply flex flex-wrap items-center;
-}
+    .testUrl {
+        @apply flex items-center text-sm truncate;
+    }
 
-.testUrl {
-    @apply flex items-center text-sm truncate;
-}
+    .main-contents {
+        @apply grid grid-cols-1 gap-6 px-6 py-12 md:grid-cols-8;
+    }
 
-.contents {
-    @apply grid grid-cols-1 gap-6 px-6 py-12 md:grid-cols-8;
-}
+    .screenshot {
+        @apply md:order-last md:col-span-2;
+    }
 
-.screenshot {
-    @apply md:order-last md:col-span-2;
-}
+    .screenshot img {
+        @apply rounded-md;
+    }
 
-.screenshot img {
-    @apply rounded-md;
-}
+    .violation {
+        @apply md:col-span-6;
+    }
 
-.violation {
-    @apply md:col-span-6;
-}
+    .violationHeader {
+        @apply text-2xl font-bold text-gray-900 lg:text-4xl sm:text-3xl;
+    }
 
-.violationHeader {
-    @apply text-2xl font-bold text-gray-900 lg:text-4xl sm:text-3xl;
-}
+    .violationSummary {
+        @apply mt-10;
+    }
 
-.violationSummary {
-    @apply mt-10;
-}
+    .violationFilter {
+        @apply flex flex-col gap-4 lg:flex-row lg:items-center;
+    }
 
-.violationFilter {
-    @apply flex flex-col gap-4 lg:flex-row lg:items-center;
-}
+    .violationFilter dt {
+        @apply font-bold shrink-0;
+    }
 
-.violationFilter dt {
-    @apply font-bold shrink-0;
-}
+    .violationFilter ul {
+        @apply flex gap-4 items-center flex-wrap;
+    }
 
-.violationFilter ul {
-    @apply flex gap-4 items-center flex-wrap;
-}
+    .violationFilterBtn {
+        @apply flex items-center overflow-hidden rounded-md border border-gray-700 hover:cursor-pointer;
+    }
 
-.violationFilterBtn {
-    @apply flex items-center overflow-hidden rounded-md border border-gray-700 hover:cursor-pointer;
-}
+    .violationFilter li:focus-within .violationFilterBtn {
+        @apply outline outline-2 outline-offset-2 outline-blue-700;
+    }
 
-.violationFilter li:focus-within .violationFilterBtn {
-    @apply outline outline-2 outline-offset-2 outline-blue-700;
-}
+    .violationFilterBtn.disabled {
+        @apply text-gray-600 bg-gray-200;
+    }
 
-.violationFilterBtn.disabled {
-    @apply text-gray-600 bg-gray-200;
-}
+    .violationFilterBtn.disabled .violationLabel {
+        @apply text-gray-600 bg-gray-200;
+    }
 
-.violationFilterBtn.disabled .violationLabel {
-    @apply text-gray-600 bg-gray-200;
-}
+    .violationFilterBtn.disabled .violationFilterNum {
+        @apply font-normal;
+    }
 
-.violationFilterBtn.disabled .violationFilterNum {
-    @apply font-normal;
-}
+    .violationLabel {
+        @apply py-1 px-4 text-white;
+    }
 
-.violationLabel {
-    @apply py-1 px-4 text-white;
-}
+    .violationLabel.minor {
+        @apply bg-sky-800;
+    }
 
-.violationLabel.minor {
-    @apply bg-sky-800;
-}
+    .violationLabel.moderate {
+        @apply bg-purple-800;
+    }
 
-.violationLabel.moderate {
-    @apply bg-purple-800;
-}
+    .violationLabel.serious {
+        @apply bg-red-700;
+    }
 
-.violationLabel.serious {
-    @apply bg-red-700;
-}
+    .violationLabel.critical {
+        @apply bg-red-900;
+    }
 
-.violationLabel.critical {
-    @apply bg-red-900;
-}
+    .violationFilterNum {
+        @apply py-1 px-4 font-bold;
+    }
 
-.violationFilterNum {
-    @apply py-1 px-4 font-bold;
-}
+    .violationFilterReset {
+        @apply w-full xl:w-fit xl:ml-6;
+    }
 
-.violationFilterReset {
-    @apply w-full xl:w-fit xl:ml-6;
-}
+    .violationFilterResetBtn {
+        @apply inline-block py-1 px-2 overflow-hidden rounded-md border border-gray-400 bg-gray-200 text-sm hover:bg-gray-300 focus:outline-offset-2;
+    }
 
-.violationFilterResetBtn {
-    @apply inline-block py-1 px-2 overflow-hidden rounded-md border border-gray-400 bg-gray-200 text-sm hover:bg-gray-300 focus:outline-offset-2;
-}
+    .violationBody {
+        @apply mt-10 rounded-md border border-gray-200;
+    }
 
-.violationBody {
-    @apply mt-10 rounded-md border border-gray-200;
-}
+    .violationBody+.violationBody {
+        @apply mt-12;
+    }
 
-.violationBody+.violationBody {
-    @apply mt-12;
-}
+    .violationBody h3 {
+        @apply text-lg font-bold text-gray-900 lg:text-2xl sm:text-xl;
+    }
 
-.violationBody h3 {
-    @apply text-lg font-bold text-gray-900 lg:text-2xl sm:text-xl;
-}
+    .violationBodyHeader {
+        @apply p-6 border-b border-gray-200 bg-amber-50;
+    }
 
-.violationBodyHeader {
-    @apply p-6 border-b border-gray-200 bg-amber-50;
-}
+    .helpUrl {
+        @apply mt-4 pl-8;
+    }
 
-.helpUrl {
-    @apply mt-4 pl-8;
-}
+    .helpUrl dl {
+        @apply flex items-center text-sm;
+    }
 
-.helpUrl dl {
-    @apply flex items-center text-sm;
-}
+    .helpUrl dt {
+        @apply shrink-0 px-4 py-1 rounded-xs border border-gray-200 bg-white;
+    }
 
-.helpUrl dt {
-    @apply shrink-0 px-4 py-1 rounded-sm border border-gray-200 bg-white;
-}
+    .helpUrl dd {
+        @apply px-4 py-1;
+    }
 
-.helpUrl dd {
-    @apply px-4 py-1;
-}
+    .helpUrl dd a {
+        @apply underline hover:text-red-800;
+    }
 
-.helpUrl dd a {
-    @apply underline hover:text-red-800;
-}
+    .tagList {
+        @apply mt-4 pl-8;
+    }
 
-.tagList {
-    @apply mt-4 pl-8;
-}
+    .tagList ul {
+        @apply flex gap-4 flex-wrap;
+    }
 
-.tagList ul {
-    @apply flex gap-4 flex-wrap;
-}
+    .tagList li span {
+        @apply inline-block py-1 px-4 rounded-md bg-sky-700 border border-sky-900 text-white text-sm;
+    }
 
-.tagList li span {
-    @apply inline-block py-1 px-4 rounded-md bg-sky-700 border border-sky-900 text-white text-sm;
-}
+    .violationItem {
+        @apply px-6;
+    }
 
-.violationItem {
-    @apply px-6;
-}
+    .violationItem>ul {
+        @apply divide-y divide-gray-200;
+    }
 
-.violationItem>ul {
-    @apply divide-y divide-gray-200;
-}
+    .violationItem>ul>li {
+        @apply py-12;
+    }
 
-.violationItem>ul>li {
-    @apply py-12;
-}
+    .violationItem dl {
+        @apply space-y-6;
+    }
 
-.violationItem dl {
-    @apply space-y-6;
-}
+    .violationItem dl>div {
+        @apply space-y-2;
+    }
 
-.violationItem dl>div {
-    @apply space-y-2;
-}
+    .failureMessage dt {
+        @apply mb-4;
+    }
 
-.failureMessage dt {
-    @apply mb-4;
-}
+    .failureMessage dd {
+        @apply text-base font-bold text-gray-900 sm:text-lg;
+    }
 
-.failureMessage dd {
-    @apply text-base font-bold text-gray-900 sm:text-lg;
-}
+    .failureList li {
+        @apply flex;
+    }
 
-.failureList li {
-    @apply flex;
-}
+    .failureListIcon {
+        @apply shrink-0 mr-2 text-red-700 h-7 flex items-center;
+    }
 
-.failureListIcon {
-    @apply shrink-0 mr-2 text-red-700 h-7 flex items-center;
-}
+    .failureListIcon svg {
+        @apply w-6 h-6;
+    }
 
-.failureListIcon svg {
-    @apply w-6 h-6;
-}
+    .impact {
+        @apply ml-4 inline-block pl-4 rounded-xs bg-gray-100 border border-gray-200 text-sm;
+    }
 
-.impact {
-    @apply ml-4 inline-block pl-4 rounded-sm bg-gray-100 border border-gray-200 text-sm;
-}
+    .impactLabel {
+        @apply inline-block ml-4 py-1 px-4 bg-white border-l border-gray-200 font-bold;
+    }
 
-.impactLabel {
-    @apply inline-block ml-4 py-1 px-4 bg-white border-l border-gray-200 font-bold;
-}
+    .impactLabel.minor {
+        @apply text-sky-800;
+    }
 
-.impactLabel.minor {
-    @apply text-sky-800;
-}
+    .impactLabel.moderate {
+        @apply text-purple-800;
+    }
 
-.impactLabel.moderate {
-    @apply text-purple-800;
-}
+    .impactLabel.serious {
+        @apply text-red-700;
+    }
 
-.impactLabel.serious {
-    @apply text-red-700;
-}
+    .impactLabel.critical {
+        @apply text-red-900;
+    }
 
-.impactLabel.critical {
-    @apply text-red-900;
-}
+    .failureSummaly,
+    .targetHTML,
+    .targetDom {
+        @apply pl-8;
+    }
 
-.failureSummaly,
-.targetHTML,
-.targetDom {
-    @apply pl-8;
-}
+    .failureSummaly dt,
+    .targetHTML dt,
+    .targetDom dt {
+        @apply font-bold;
+    }
 
-.failureSummaly dt,
-.targetHTML dt,
-.targetDom dt {
-    @apply font-bold;
-}
+    .targetHTML code,
+    .targetDom code {
+        @apply block bg-gray-800 text-white rounded-md border-gray-900 font-mono py-2 px-4 whitespace-nowrap overflow-auto text-sm;
+    }
 
-.targetHTML code,
-.targetDom code {
-    @apply block bg-gray-800 text-white rounded-md border-gray-900 font-mono py-2 px-4 whitespace-nowrap overflow-auto text-sm;
-}
+    .noIssues {
+        @apply p-6 flex items-center text-lg font-bold text-green-800 lg:text-2xl sm:text-xl;
+    }
 
-.noIssues {
-    @apply p-6 flex items-center text-lg font-bold text-green-800 lg:text-2xl sm:text-xl;
-}
+    .noIssues .icon {
+        @apply shrink-0 mr-4;
+    }
 
-.noIssues .icon {
-    @apply shrink-0 mr-4;
-}
-
-.noIssues .icon svg {
-    @apply w-6 h-6 lg:w-10 lg:h-10;
+    .noIssues .icon svg {
+        @apply w-6 h-6 lg:w-10 lg:h-10;
+    }
 }
