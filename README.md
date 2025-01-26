@@ -4,6 +4,12 @@ Automated accessibility testing script using @axe-core/puppeteer, outputting res
 
 [@axe-core/puppeteer](https://github.com/dequelabs/axe-core-npm/blob/develop/packages/puppeteer/README.md) を使用して、テキストファイルで作成した URL リストに対して自動的にアクセシビリティテストを実行し、その結果を HTML ファイルとして保存するスクリプトです。
 
+## Requirements
+
+Node.js version 22.x or newer.
+
+Node.js 22.x 以上をご利用ください。
+
 ## Getting Started
 
 Install Node.js if you haven't already.
@@ -24,6 +30,11 @@ Rename `urls.sample.txt` to `urls.txt` and edit it to create a list of URLs you 
 
 ```sh
 node axe-auto-reporter.mjs
+```
+or
+
+```sh
+npm run check
 ```
 
 When you run the test, a `results` directory will be created, and the test results will be stored inside. Tests are organized by the date and time they were executed, with HTML files saved in the `html` directory and JSON files in the `json` directory.
