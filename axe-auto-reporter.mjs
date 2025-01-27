@@ -36,6 +36,17 @@ const ensureDirectoryExists = (dir) => {
     }
 };
 
+// HTML escape
+const escapeHtml = unsafe => (
+    unsafe
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br>')
+);
+
 (async () => {
 
     // Load configure
@@ -154,7 +165,8 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
             labelViolationFilterNote: '(Uncheck to hide failures of the corresponding impact level)',
             labelViolationFilterReset: 'Reset Filter',
             labelViolationFilterResetAriaLabel: 'Reset the impact filter to display all failures.',
-        }
+        },
+        // Add translations for other languages as necessary.
     };
 
     const translate = (key, subkey) => {
@@ -327,14 +339,3 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
             </div>
         `);
 };
-
-// HTML escape
-const escapeHtml = unsafe => (
-    unsafe
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/'/g, '&quot;')
-        .replace(/'/g, '&#039;')
-        .replace(/\n/g, '<br>')
-);
