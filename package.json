@@ -24,6 +24,7 @@
   "dependencies": {
     "@axe-core/puppeteer": "^4.10.1",
     "@tailwindcss/cli": "^4.0.0",
+    "minimist": "^1.2.8",
     "puppeteer": "^24.1.1"
   },
   "devDependencies": {
