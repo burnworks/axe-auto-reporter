@@ -985,6 +985,75 @@
       width: calc(var(--spacing) * 10);
     }
   }
+  .summary-table {
+    padding-inline: calc(var(--spacing) * 6);
+    padding-block: calc(var(--spacing) * 12);
+    .overflow-table {
+      overflow-x: auto;
+      scroll-behavior: smooth;
+    }
+    table {
+      min-width: 100%;
+      :where(& > :not(:last-child)) {
+        --tw-divide-y-reverse: 0;
+        border-bottom-style: var(--tw-border-style);
+        border-top-style: var(--tw-border-style);
+        border-top-width: calc(1px * var(--tw-divide-y-reverse));
+        border-bottom-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+      }
+      :where(& > :not(:last-child)) {
+        border-color: var(--color-gray-300);
+      }
+    }
+    thead {
+      background-color: var(--color-gray-50);
+      th {
+        padding-inline: calc(var(--spacing) * 3);
+        padding-block: calc(var(--spacing) * 3.5);
+        text-align: left;
+        font-size: var(--text-sm);
+        line-height: var(--tw-leading, var(--text-sm--line-height));
+        --tw-font-weight: var(--font-weight-semibold);
+        font-weight: var(--font-weight-semibold);
+        white-space: nowrap;
+        color: var(--color-gray-900);
+      }
+    }
+    tbody {
+      :where(& > :not(:last-child)) {
+        --tw-divide-y-reverse: 0;
+        border-bottom-style: var(--tw-border-style);
+        border-top-style: var(--tw-border-style);
+        border-top-width: calc(1px * var(--tw-divide-y-reverse));
+        border-bottom-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+      }
+      :where(& > :not(:last-child)) {
+        border-color: var(--color-gray-200);
+      }
+      background-color: var(--color-white);
+      th {
+        padding-inline: calc(var(--spacing) * 3);
+        padding-block: calc(var(--spacing) * 3.5);
+        text-align: left;
+        font-size: var(--text-sm);
+        line-height: var(--tw-leading, var(--text-sm--line-height));
+        --tw-font-weight: var(--font-weight-semibold);
+        font-weight: var(--font-weight-semibold);
+        white-space: nowrap;
+        color: var(--color-gray-900);
+      }
+      td {
+        padding-inline: calc(var(--spacing) * 3);
+        padding-block: calc(var(--spacing) * 4);
+        white-space: nowrap;
+      }
+    }
+    .violation-count-summary {
+      display: flex;
+      align-items: center;
+      gap: calc(var(--spacing) * 4);
+    }
+  }
 }
 @keyframes spin {
   to {

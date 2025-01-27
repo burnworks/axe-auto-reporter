@@ -252,4 +252,42 @@
     .noIssues .icon svg {
         @apply w-6 h-6 lg:w-10 lg:h-10;
     }
+
+    /* Summary Page */
+
+    .summary-table {
+        @apply px-6 py-12;
+
+        .overflow-table {
+            @apply overflow-x-auto scroll-smooth;
+        }
+
+        table {
+            @apply min-w-full divide-y divide-gray-300;
+        }
+
+        thead  {
+            @apply bg-gray-50;
+
+            th {
+                @apply px-3 py-3.5 text-left text-sm font-semibold text-gray-900 whitespace-nowrap;
+            }
+        }
+
+        tbody {
+            @apply divide-y divide-gray-200 bg-white;
+
+            th {
+                @apply px-3 py-3.5 text-left text-sm font-semibold text-gray-900 whitespace-nowrap;
+            }
+            td {
+                @apply px-3 py-4 whitespace-nowrap;
+            }
+        }
+
+        .violation-count-summary {
+            @apply flex items-center gap-4;
+        }
+    }
+
 }
