@@ -1,7 +1,7 @@
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import puppeteer from 'puppeteer';
 import { loadPage } from '@axe-core/puppeteer';
 import AXELOCALES_JA from 'axe-core/locales/ja.json' with { type: 'json' };
-import fs from 'fs';
 import path from 'path';
 import config from './config.mjs';
 
@@ -13,26 +13,33 @@ const VIEWPORTS = {
 
 // Configure
 const reportConfigure = () => {
-    if (config.locale === 'ja') {
-        config.localeData = AXELOCALES_JA;
+    const newConfig = { ...config };
+    if (newConfig.locale === 'ja') {
+        newConfig.localeData = AXELOCALES_JA;
     }
-
-    if (config.mode === 'pc') {
-        config.viewport = VIEWPORTS.PC;
-    } else if (config.mode === 'mobile') {
-        config.viewport = VIEWPORTS.MOBILE;
+    if (newConfig.mode === 'pc') {
+        newConfig.viewport = VIEWPORTS.PC;
+    } else if (newConfig.mode === 'mobile') {
+        newConfig.viewport = VIEWPORTS.MOBILE;
     } else {
         console.error('\x1b[31mInvalid mode specified\x1b[0m');
         throw new Error('Invalid mode specified');
     }
-
-    return config;
+    return newConfig;
 };
 
+// Error Handling
+process.on('unhandledRejection', (error) => {
+    console.error('\x1b[31mUnhandled promise rejection:\x1b[0m', error);
+    process.exit(1);
+});
+
 // Folder existence check and creation
-const ensureDirectoryExists = (dir) => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir);
+const ensureDirectoryExists = async (dir) => {
+    try {
+        await mkdir(dir, { recursive: true });
+    } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
     }
 };
 
@@ -47,47 +54,66 @@ const escapeHtml = unsafe => (
         .replace(/\n/g, '<br>')
 );
 
-(async () => {
+try {
 
     // Load configure
     const { urlList, localeData, tags, locale, viewport } = reportConfigure();
 
     // Puppeteer launch
-    const browser = await puppeteer.launch({ headless: 'new', defaultViewport: viewport, });
+    const browser = await puppeteer.launch({
+        headless: 'new',
+        defaultViewport: viewport,
+    });
 
     // Read URLs from the external file
-    const urls = fs.readFileSync(urlList, 'utf-8').split('\n').filter(Boolean);
+    const urlsContent = await readFile(urlList, 'utf-8');
+    const urls = urlsContent.split('\n').filter(Boolean);
 
     // Create a 'results' directory if it doesn't exist
     const resultsFolder = 'results';
-    ensureDirectoryExists(resultsFolder);
+    await ensureDirectoryExists(resultsFolder);
 
     // Create a folder inside 'results' based on the current datetime (`yyyy-mm-dd_hh-mm-ss`)
     const now = new Date();
-    const dateTimeFolder = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+    const dateTimeFolder = new Intl.DateTimeFormat('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    }).format(now).replace(/[\/\s:]/g, '-');
     const folderName = path.join(resultsFolder, dateTimeFolder);
-    ensureDirectoryExists(folderName);
+    await ensureDirectoryExists(folderName);
 
     // Create subdirectories for JSON and HTML files inside the dateTime folder
     const jsonFolder = path.join(folderName, 'json');
     const htmlFolder = path.join(folderName, 'html');
-    ensureDirectoryExists(jsonFolder);
-    ensureDirectoryExists(htmlFolder);
+    await Promise.all([
+        ensureDirectoryExists(jsonFolder),
+        ensureDirectoryExists(htmlFolder)
+    ]);
+
+    // Sanitize file name
+    const sanitizeFilenamePart = (str) => str.replace(/[^a-zA-Z0-9\-_.]/g, '_');
 
     // Set count for progress
     let processedCount = 0;
 
     // Run Tests
-    for (let url of urls) {
+    for (const url of urls) {
+        if (typeof url !== 'string') continue;
+        let page;
         try {
             // Output progress (start)
             console.log(`Processing ${processedCount + 1}/${urls.length}: ${url}`);
 
             // Load page
             const axeBuilder = await loadPage(browser, url.trim());
+            page = axeBuilder.page;
 
             // Get a screenshot of the page in Base64 format
-            const page = axeBuilder.page;
             const screenshotBase64 = await page.screenshot({ encoding: 'base64' });
 
             // Get test results
@@ -96,33 +122,45 @@ const escapeHtml = unsafe => (
             // Create file name
             const parsedURL = new URL(url);
             const domain = parsedURL.hostname;
-            const pathName = parsedURL.pathname.slice(1).replace(/\/$/g, '').replace(/[^a-zA-Z0-9\-_.]/g, '_');
-            const queryString = parsedURL.search.slice(1).replace(/[^a-zA-Z0-9\-_.]/g, '_');
+            const pathName = sanitizeFilenamePart(parsedURL.pathname.slice(1).replace(/\/$/g, ''));
+            const queryString = sanitizeFilenamePart(parsedURL.search.slice(1));
             const baseFilename = `${domain}${pathName ? `_${pathName}` : ''}${queryString ? `_${queryString}` : ''}`;
 
             // Save results to an external JSON file (eg. example.com_pathname.json)
             const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
-            fs.writeFileSync(jsonFilename, JSON.stringify(results, null, 2), 'utf-8');
+            await writeFile(jsonFilename, JSON.stringify(results, null, 2), 'utf-8');
 
             // Save results to an external HTML file (eg. example.com_pathname.html)
             const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
-            const htmlContent = generateHtmlReport(url, results, screenshotBase64, locale);
-            fs.writeFileSync(htmlFilename, htmlContent, 'utf-8');
+            const htmlContent = await generateHtmlReport(url, results, screenshotBase64, locale);
+            await writeFile(htmlFilename, htmlContent, 'utf-8');
 
             // Output progress (complete)
             processedCount++;
             console.log(`\x1b[32mCompleted!\x1b[0m ${processedCount}/${urls.length}: ${url}`);
         } catch (error) {
-            console.log(`\x1b[31mFailed to process URL:\x1b[0m ${url}. Error: ${error.message}`);
+            console.error(`\x1b[31mFailed to process URL:\x1b[0m ${url}`, {
+                message: error.message,
+                stack: error.stack,
+                url,
+                timestamp: new Date().toISOString()
+            });
             processedCount++;
+        } finally {
+            if (page && !page.isClosed()) {
+                await page.close();
+            }
         }
     }
 
     await browser.close();
-})();
+} catch (error) {
+    console.error('Fatal error:', error);
+    process.exit(1);
+}
 
 // Generate HTML
-const generateHtmlReport = (url, results, screenshotBase64, locale) => {
+async function generateHtmlReport(url, results, screenshotBase64, locale) {
     const translations = {
         ja: {
             labelTitle: 'アクセシビリティレポート',
@@ -174,13 +212,13 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
         return subkey ? keys[key][subkey] || keys[key] : keys[key] || 'Translation missing';
     };
 
-    const template = fs.readFileSync('template/template.html', 'utf-8');
-    const cssContent = fs.readFileSync('template/styles.css', 'utf-8');
+    const template = await readFile('template/template.html', 'utf-8');
+    const cssContent = await readFile('template/styles.css', 'utf-8');
 
     let impactListHtml;
     let violationHtml;
 
-    if (results.violations.length === 0) {
+    if (!results?.violations?.length) {
         violationHtml = `
             <div class="violationBody">
                 <p class="noIssues">
@@ -203,7 +241,7 @@ const generateHtmlReport = (url, results, screenshotBase64, locale) => {
 
         for (const violation of results.violations) {
             for (const node of violation.nodes) {
-                if (impactCounts.hasOwnProperty(node.impact)) {
+                if (Object.hasOwn(impactCounts, node.impact)) {
                     impactCounts[node.impact]++;
                 }
             }
