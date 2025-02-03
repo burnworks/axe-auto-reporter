@@ -1,8 +1,14 @@
-import { promises as fs } from 'fs';
+/* ======================================
+このスクリプトは開発者プレビューです。
+レポート作成処理完了後、
+node build-summary.mjs --path ./results/yyyy-mm-dd-hh-mm-ss/
+で指定したディレクトリ内にサマリーページを生成します。
+====================================== */
+
+import fs from 'fs/promises';
 import path from 'path';
-import process from 'process';
-import config from './config.mjs';
 import minimist from 'minimist';
+import config from './config.mjs';
 
 // 翻訳データ
 const translations = {
@@ -118,6 +124,9 @@ const buildSummary = async () => {
         console.warn(`Warning: No JSON files found in ${jsonDir}.`);
     }
 
+    // Sanitize file name
+    const sanitizeFilenamePart = (str) => str.replace(/[^a-zA-Z0-9\-_.]/g, '_');
+
     const tableRows = [];
 
     for (const file of jsonFiles) {
@@ -160,10 +169,26 @@ const buildSummary = async () => {
                 </li>
         `).join('');
 
+        // レポートHTMLへのリンク用に URL からファイル名を生成
+        const parsedURL = new URL(url);
+        const domain = parsedURL.hostname;
+        const pathName = sanitizeFilenamePart(parsedURL.pathname.slice(1).replace(/\/$/g, ''));
+        const queryString = sanitizeFilenamePart(parsedURL.search.slice(1));
+        const baseFilename = `${domain}${pathName ? `_${pathName}` : ''}${queryString ? `_${queryString}` : ''}`;
+
         // テーブル行の追加
         tableRows.push(`
         <tr>
-            <th scope="row"><a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></th>
+            <th scope="row">
+                <div class="report-link">
+                    <a href="../html/${escapeHtml(baseFilename)}.html" title="「${escapeHtml(url)}」の詳細レポートを開く" aria-label="「${escapeHtml(url)}」の詳細レポートを開く">${escapeHtml(url)}</a>
+                    <a class="report-link-ex" href="${escapeHtml(url)}" target="_blank" title="実際のページ（${escapeHtml(url)}）を別窓で開く" aria-label="実際のページ（${escapeHtml(url)}）を別窓で開く">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="report-link-ex-icon" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                    </a>
+                </div>
+            </th>
             <td>
                 <ul class="violation-count-summary">
                     ${impactListHtml}
