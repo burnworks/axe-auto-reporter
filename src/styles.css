@@ -285,6 +285,18 @@
             }
         }
 
+        .report-link {
+            @apply flex items-center gap-2;
+        }
+
+        .report-link-ex {
+            @apply inline-flex p-2 text-gray-600;
+        }
+
+        .report-link-ex-icon {
+            @apply size-4;
+        }
+
         .violation-count-summary {
             @apply flex items-center gap-4;
         }
