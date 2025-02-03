@@ -74,3 +74,13 @@ Attempting to run automated tests on too many URLs may not work properly and has
 Tailwind CSS is used to generate the stylesheet for the HTML template. It does not affect the functionality of the script.
 
 Tailwind CSS は HTML テンプレートのスタイルシートを生成するために使用しています。スクリプトの動作には関係ありません。つまり、本スクリプトを使用するだけであれば Tailwind CSS はインストール不要です。
+
+***
+
+## アクセシビリティチェックをご希望の企業様へ
+
+何らかの理由で Node.js 実行環境が構築できないが本スクリプトを使用したアクセシビリティチェックを自社サイトに対して実行したいとお考えの企業様。
+
+バーンワークス株式会社では低コストで自動アクセシビリティチェックを実施しますので、お気軽にお問い合わせください。
+
+- [自動アクセシビリティチェックサービス - バーンワークス株式会社](https://burnworks.com/service/accessibility-auto-check/)
