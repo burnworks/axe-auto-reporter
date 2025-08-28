@@ -13,6 +13,11 @@ import path from 'path';
 import config from './config.mjs';
 
 /**
+ * Global template cache promise for module-level initialization
+ */
+let TEMPLATE_CACHE_PROMISE = null;
+
+/**
  * @typedef {Object} Viewport
  * @property {number} width - Viewport width in pixels
  * @property {number} height - Viewport height in pixels
@@ -349,6 +354,28 @@ const validateConfig = (config) => {
 const TEMPLATE_CACHE = new Map();
 
 /**
+ * Initialize template cache on module load
+ * @returns {Promise<void>}
+ */
+const initializeTemplateCache = async () => {
+    if (TEMPLATE_CACHE_PROMISE) return TEMPLATE_CACHE_PROMISE;
+    
+    TEMPLATE_CACHE_PROMISE = (async () => {
+        try {
+            await Promise.all([
+                readCachedTemplate(config.templatePath),
+                readCachedTemplate(config.stylesPath)
+            ]);
+            console.log('\x1b[36mTemplate cache initialized\x1b[0m');
+        } catch (error) {
+            console.warn('\x1b[33mTemplate cache initialization failed:\x1b[0m', error.message);
+        }
+    })();
+    
+    return TEMPLATE_CACHE_PROMISE;
+};
+
+/**
  * Reads and caches template files for performance
  * @param {string} filePath - Path to the template file
  * @returns {Promise<string>} File content
@@ -410,6 +437,9 @@ const TRANSLATIONS = Object.freeze({
         labelViolationFilterResetAriaLabel: 'Reset the impact filter to display all failures.',
     },
 });
+
+// Initialize template cache on module load
+initializeTemplateCache();
 
 /**
  * Escapes HTML special characters to prevent XSS
@@ -585,127 +615,152 @@ try {
         if (!isValidNumber(index, 1) || !isValidNumber(total, 1)) {
             return { url, success: false, error: 'Invalid index or total parameters' };
         }
-        
-        let page;
+
+        let page = null;
+        let axeBuilder = null;
+        let responseHandler = null;
+
         try {
-            // Output progress (start)
-            console.log(`Processing ${index}/${total}: ${url}`);
-
-            // Load page with security settings
-            const axeBuilder = await loadPage(browser, url.trim());
-            page = axeBuilder.page;
-
-            // Set page security policies
-            await page.setDefaultNavigationTimeout(navigationTimeout);
-            await page.setDefaultTimeout(navigationTimeout);
+            // 1. Initialize page with security settings
+            ({ page, axeBuilder, responseHandler } = await initializePage(url, index, total, browser, navigationTimeout, maxPageSize));
             
-            // Enable JavaScript for accessibility testing (required for axe-core)
-            await page.setJavaScriptEnabled(true);
+            // 2. Capture screenshot
+            const screenshotBase64 = await captureScreenshot(page, enableScreenshots, screenshotFormat, screenshotQuality);
             
-            // Set response size limit with cleanup
-            let responseHandler;
-            if (maxPageSize > 0) {
-                responseHandler = (response) => {
-                    const contentLength = response.headers()['content-length'];
-                    if (contentLength && parseInt(contentLength, 10) > maxPageSize) {
-                        throw new Error(`Page size exceeds limit: ${contentLength} bytes`);
-                    }
-                };
-                page.on('response', responseHandler);
-            }
-
-            // Get a screenshot of the page with memory optimization
-            let screenshotBase64 = '';
-            if (enableScreenshots) {
-                const screenshotOptions = { 
-                    encoding: 'base64',
-                    type: screenshotFormat,
-                    ...(screenshotFormat !== 'png' && { quality: screenshotQuality })
-                };
-                screenshotBase64 = await page.screenshot(screenshotOptions);
-            }
-
-            // Get test results
-            const results = await axeBuilder.configure({ locale: localeData }).withTags(tags).analyze();
-
-            // Validate axe results
-            if (!results || typeof results !== 'object') {
-                throw new Error('Invalid axe test results received');
-            }
-
-            // Create file name with validation
-            const parsedURL = new URL(url);
-            const domain = parsedURL.hostname;
+            // 3. Run accessibility test
+            const results = await runAccessibilityTest(axeBuilder, localeData, tags);
             
-            if (!isValidString(domain)) {
-                throw new Error('Invalid domain extracted from URL');
-            }
+            // 4. Save results to files
+            await saveResults(url, results, screenshotBase64, locale, templatePath, stylesPath, jsonFolder, htmlFolder, jsonIndentation);
             
-            const pathName = sanitizeFilenamePart(parsedURL.pathname.slice(1).replace(/\/$/g, ''));
-            const queryString = sanitizeFilenamePart(parsedURL.search.slice(1));
-            const baseFilename = `${domain}${pathName ? `_${pathName}` : ''}${queryString ? `_${queryString}` : ''}`;
+            // 5. Clean up memory
+            await cleanupMemory(results, index);
             
-            if (!isValidString(baseFilename)) {
-                throw new Error('Failed to generate valid filename');
-            }
-
-            // Save results to an external JSON file (eg. example.com_pathname.json)
-            // Use streaming for large JSON to reduce memory usage
-            const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
-            const jsonData = JSON.stringify(results, null, jsonIndentation);
-            await writeFile(jsonFilename, jsonData, { encoding: 'utf-8', flag: 'w' });
-            
-            // Clear reference to help garbage collection
-            results.violations?.forEach(violation => {
-                if (violation.nodes) {
-                    violation.nodes.forEach(node => {
-                        delete node.element;
-                    });
-                }
-            });
-
-            // Save results to an external HTML file (eg. example.com_pathname.html)
-            const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
-            const htmlContent = await generateHtmlReport(url, results, screenshotBase64, locale, templatePath, stylesPath);
-            
-            if (!isValidString(htmlContent)) {
-                throw new Error('Failed to generate valid HTML content');
-            }
-            
-            await writeFile(htmlFilename, htmlContent, { encoding: 'utf-8', flag: 'w' });
-
-            // Clear large variables to help garbage collection
-            screenshotBase64 = null;
-            
-            // Output progress (complete)
             console.log(`\x1b[32mCompleted!\x1b[0m ${index}/${total}: ${url}`);
             return { url, success: true };
+
         } catch (error) {
-            const errorInfo = {
-                url,
-                message: error.message,
-                stack: error.stack,
-                timestamp: new Date().toISOString(),
-                type: error.constructor.name
-            };
-            
-            console.error(`\x1b[31mFailed to process URL:\x1b[0m ${url}`);
-            console.error('Error details:', errorInfo);
-            
-            return { url, success: false, error: errorInfo };
+            return handleProcessingError(error, url);
         } finally {
-            if (page && !page.isClosed()) {
-                // Clean up event listeners before closing page
-                if (responseHandler && maxPageSize > 0) {
-                    page.off('response', responseHandler);
+            await safeCleanupPage(page, responseHandler, maxPageSize, index);
+        }
+    };
+
+    // Helper functions for processUrl
+    const initializePage = async (url, index, total, browser, navigationTimeout, maxPageSize) => {
+        console.log(`Processing ${index}/${total}: ${url}`);
+
+        const axeBuilder = await loadPage(browser, url.trim());
+        const page = axeBuilder.page;
+
+        await page.setDefaultNavigationTimeout(navigationTimeout);
+        await page.setDefaultTimeout(navigationTimeout);
+        await page.setJavaScriptEnabled(true);
+
+        let responseHandler = null;
+        if (maxPageSize > 0) {
+            responseHandler = (response) => {
+                const contentLength = response.headers()['content-length'];
+                if (contentLength && parseInt(contentLength, 10) > maxPageSize) {
+                    throw new Error(`Page size exceeds limit: ${contentLength} bytes`);
                 }
-                await page.close();
+            };
+            page.on('response', responseHandler);
+        }
+
+        return { page, axeBuilder, responseHandler };
+    };
+
+    const captureScreenshot = async (page, enableScreenshots, screenshotFormat, screenshotQuality) => {
+        if (!enableScreenshots) return '';
+
+        const screenshotOptions = { 
+            encoding: 'base64',
+            type: screenshotFormat,
+            ...(screenshotFormat !== 'png' && { quality: screenshotQuality })
+        };
+        return await page.screenshot(screenshotOptions);
+    };
+
+    const runAccessibilityTest = async (axeBuilder, localeData, tags) => {
+        const results = await axeBuilder.configure({ locale: localeData }).withTags(tags).analyze();
+
+        if (!results || typeof results !== 'object') {
+            throw new Error('Invalid axe test results received');
+        }
+
+        return results;
+    };
+
+    const saveResults = async (url, results, screenshotBase64, locale, templatePath, stylesPath, jsonFolder, htmlFolder, jsonIndentation) => {
+        const parsedURL = new URL(url);
+        const domain = parsedURL.hostname;
+        
+        if (!isValidString(domain)) {
+            throw new Error('Invalid domain extracted from URL');
+        }
+        
+        const pathName = sanitizeFilenamePart(parsedURL.pathname.slice(1).replace(/\/$/g, ''));
+        const queryString = sanitizeFilenamePart(parsedURL.search.slice(1));
+        const baseFilename = `${domain}${pathName ? `_${pathName}` : ''}${queryString ? `_${queryString}` : ''}`;
+        
+        if (!isValidString(baseFilename)) {
+            throw new Error('Failed to generate valid filename');
+        }
+
+        // Save JSON file
+        const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
+        const jsonData = JSON.stringify(results, null, jsonIndentation);
+        await writeFile(jsonFilename, jsonData, { encoding: 'utf-8', flag: 'w' });
+        
+        // Save HTML file
+        const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
+        const htmlContent = await generateHtmlReport(url, results, screenshotBase64, locale, templatePath, stylesPath);
+        
+        if (!isValidString(htmlContent)) {
+            throw new Error('Failed to generate valid HTML content');
+        }
+        
+        await writeFile(htmlFilename, htmlContent, { encoding: 'utf-8', flag: 'w' });
+    };
+
+    const cleanupMemory = async (results, index) => {
+        // Clear references to help garbage collection
+        results.violations?.forEach(violation => {
+            if (violation.nodes) {
+                violation.nodes.forEach(node => {
+                    delete node.element;
+                });
             }
-            
-            // Periodic garbage collection (deterministic timing)
-            if (global.gc && (index % 10 === 0)) { // Every 10th URL
-                global.gc();
+        });
+
+        // Periodic garbage collection
+        if (global.gc && (index % 10 === 0)) {
+            global.gc();
+        }
+    };
+
+    const handleProcessingError = (error, url) => {
+        const errorInfo = {
+            url,
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString(),
+            type: error.constructor.name
+        };
+        
+        console.error(`\x1b[31mFailed to process URL:\x1b[0m ${url}`);
+        console.error('Error details:', errorInfo);
+        
+        return { url, success: false, error: errorInfo };
+    };
+
+    const safeCleanupPage = async (page, responseHandler, maxPageSize, index) => {
+        if (page && !page.isClosed()) {
+            if (responseHandler && maxPageSize > 0) {
+                page.off('response', responseHandler);
             }
+            await page.close();
         }
     };
 
