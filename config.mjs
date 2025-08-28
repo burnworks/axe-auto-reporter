@@ -35,6 +35,10 @@
  * @property {ScreenshotFormat} screenshotFormat - Format for screenshots
  * @property {number} screenshotQuality - Quality for JPEG/WebP screenshots (0-100)
  * @property {boolean} enableScreenshots - Enable/disable screenshot capture
+ * @property {string} outputDirectory - Directory for storing results
+ * @property {string} templatePath - Path to HTML template file
+ * @property {string} stylesPath - Path to CSS styles file
+ * @property {number} jsonIndentation - Number of spaces for JSON pretty printing
  */
 
 /**
@@ -75,4 +79,18 @@ export default {
     
     /** Enable/disable screenshot capture to save memory */
     enableScreenshots: true,
+    
+    // File and directory paths
+    /** Directory for storing results */
+    outputDirectory: 'results',
+    
+    /** Path to HTML template file */
+    templatePath: 'template/template.html',
+    
+    /** Path to CSS styles file */
+    stylesPath: 'template/styles.css',
+    
+    // Output formatting
+    /** Number of spaces for JSON pretty printing */
+    jsonIndentation: 2,
 };
