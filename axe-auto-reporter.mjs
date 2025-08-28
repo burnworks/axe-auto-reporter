@@ -26,9 +26,7 @@ import config from './config.mjs';
  * @type {Object.<string, Viewport>}
  */
 const VIEWPORTS = {
-    /** Desktop/PC viewport (1024x768) */
     PC: { width: 1024, height: 768 },
-    /** Mobile viewport (375x812) */
     MOBILE: { width: 375, height: 812 }
 };
 
@@ -184,18 +182,25 @@ const isIpInCidr = (ip, cidr) => {
         } else if (isIPv6) {
             if (prefix < 0 || prefix > 128) return false;
             
-            // Validate IP addresses using Node.js built-in validation
+            /**
+             * Validate IP addresses using Node.js built-in validation
+             */
             if (isIP(network) !== 6 || isIP(ip) !== 6) return false;
             
-            // Convert IPv6 addresses to binary representation
+            /**
+             * Convert IPv6 addresses to binary representation
+             * @param {string} addr - IPv6 address to convert
+             * @returns {string} Binary representation
+             */
             const ipv6ToBinary = (addr) => {
-                // Expand IPv6 address to full form
+                /**
+                 * Expand IPv6 address to full form
+                 */
                 const parts = addr.split(':');
                 const expandedParts = [];
                 let doubleColonIndex = parts.indexOf('');
                 
                 if (doubleColonIndex !== -1) {
-                    // Handle :: notation
                     const beforeDouble = parts.slice(0, doubleColonIndex);
                     const afterDouble = parts.slice(doubleColonIndex + 1).filter(p => p !== '');
                     const zerosNeeded = 8 - beforeDouble.length - afterDouble.length;
@@ -209,7 +214,9 @@ const isIpInCidr = (ip, cidr) => {
                     expandedParts.push(...parts);
                 }
                 
-                // Pad each part to 4 hex digits and convert to binary
+                /**
+                 * Pad each part to 4 hex digits and convert to binary
+                 */
                 return expandedParts
                     .map(part => parseInt(part.padStart(4, '0'), 16))
                     .map(num => num.toString(2).padStart(16, '0'))
@@ -221,7 +228,9 @@ const isIpInCidr = (ip, cidr) => {
             
             if (networkBinary.length !== 128 || ipBinary.length !== 128) return false;
             
-            // Compare up to prefix length
+            /**
+             * Compare up to prefix length
+             */
             const networkPrefix = networkBinary.substring(0, prefix);
             const ipPrefix = ipBinary.substring(0, prefix);
             
@@ -517,19 +526,20 @@ try {
     } = config;
 
     /**
-     * Launch Puppeteer with memory optimizations and security settings
+     * Puppeteer launch arguments with memory optimizations and security settings
+     * @type {string[]}
      */
     const launchArgs = [
-        '--disable-dev-shm-usage', // Use disk instead of shared memory
+        '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
         '--disable-gpu',
-        '--memory-pressure-off', // Disable memory pressure detection
+        '--memory-pressure-off',
         '--disable-extensions',
         '--disable-plugins',
-        '--disable-images', // Disable image loading for performance and security
-        '--disable-background-timer-throttling', // Improve performance
+        '--disable-images',
+        '--disable-background-timer-throttling',
         '--disable-renderer-backgrounding',
         '--disable-backgrounding-occluded-windows',
     ];
@@ -556,8 +566,12 @@ try {
         throw new Error('URL list file path must be within current directory');
     }
     
-    if (urlList.includes('..') || path.isAbsolute(urlList)) {
-        throw new Error('Relative paths with ".." or absolute paths are not allowed');
+    /**
+     * Check for path traversal attempts after normalization
+     */
+    const relativePath = path.relative(currentDir, normalizedPath);
+    if (relativePath.includes('..') || path.isAbsolute(relativePath) || relativePath.startsWith('/')) {
+        throw new Error('Path contains invalid characters or attempts path traversal');
     }
 
     const urlsContent = await readFile(urlList, 'utf-8');
@@ -630,7 +644,7 @@ try {
     await ensureDirectoryExists(folderName);
     const jsonFolder = path.join(folderName, 'json');
     const htmlFolder = path.join(folderName, 'html');
-    const screenshotFolder = path.join(htmlFolder, 'images');  // htmlフォルダ内にimagesディレクトリ
+    const screenshotFolder = path.join(htmlFolder, 'images');
     await Promise.all([
         ensureDirectoryExists(jsonFolder),
         ensureDirectoryExists(htmlFolder),
@@ -650,10 +664,10 @@ try {
 
         let page = null;
         let axeBuilder = null;
-        let responseHandler = null;
+        let eventHandlers = [];
 
         try {
-            ({ page, axeBuilder, responseHandler } = await initializePage(url, index, total, browser, navigationTimeout, maxPageSize));
+            ({ page, axeBuilder, eventHandlers } = await initializePage(url, index, total, browser, navigationTimeout, maxPageSize));
             
             const screenshotBuffer = await captureScreenshot(page, enableScreenshots, screenshotFormat, screenshotQuality);
             
@@ -669,7 +683,7 @@ try {
         } catch (error) {
             return handleProcessingError(error, url);
         } finally {
-            await safeCleanupPage(page, responseHandler, maxPageSize, index);
+            await safeCleanupPage(page, eventHandlers, index);
         }
     };
 
@@ -683,18 +697,19 @@ try {
         await page.setDefaultTimeout(navigationTimeout);
         await page.setJavaScriptEnabled(true);
 
-        let responseHandler = null;
+        const eventHandlers = [];
         if (maxPageSize > 0) {
-            responseHandler = (response) => {
+            const responseHandler = (response) => {
                 const contentLength = response.headers()['content-length'];
                 if (contentLength && parseInt(contentLength, 10) > maxPageSize) {
                     throw new Error(`Page size exceeds limit: ${contentLength} bytes`);
                 }
             };
             page.on('response', responseHandler);
+            eventHandlers.push({ event: 'response', handler: responseHandler });
         }
 
-        return { page, axeBuilder, responseHandler };
+        return { page, axeBuilder, eventHandlers };
     };
 
     const captureScreenshot = async (page, enableScreenshots, screenshotFormat, screenshotQuality) => {
@@ -770,7 +785,6 @@ try {
             try {
                 globalThis.gc();
             } catch (error) {
-                // Ignore errors
             }
         }
     };
@@ -790,16 +804,24 @@ try {
         return { url, success: false, error: errorInfo };
     };
 
-    const safeCleanupPage = async (page, responseHandler, maxPageSize, index) => {
+    const safeCleanupPage = async (page, eventHandlers, index) => {
         if (page && !page.isClosed()) {
-            if (responseHandler && maxPageSize > 0) {
-                page.off('response', responseHandler);
+            for (const { event, handler } of eventHandlers) {
+                try {
+                    page.off(event, handler);
+                } catch (error) {
+                    console.warn(`\x1b[33mWarning: Failed to remove ${event} handler for page ${index}:\x1b[0m`, error.message);
+                }
             }
             await page.close();
         }
     };
 
-    // Extract domain information for rate limiting
+    /**
+     * Extracts domain from URL for rate limiting purposes
+     * @param {string} url - URL to extract domain from
+     * @returns {string} Domain hostname or 'invalid-domain'
+     */
     const extractDomain = (url) => {
         try {
             return new URL(url).hostname;
@@ -808,7 +830,10 @@ try {
         }
     };
 
-    // Group URLs by domain for rate limiting
+    /**
+     * Group URLs by domain for rate limiting
+     * @type {Map<string, Array<{url: string, index: number}>>}
+     */
     const urlsByDomain = new Map();
     urls.forEach((url, index) => {
         const domain = extractDomain(url);
@@ -818,7 +843,9 @@ try {
         urlsByDomain.get(domain).push({ url, index });
     });
 
-    // Create domain-specific queues for rate limiting
+    /**
+     * Create domain-specific queues for rate limiting
+     */
     const { maxConcurrentPerDomain, delayBetweenRequests } = config;
     const domainQueues = new Map();
     const domainLastRequest = new Map();
@@ -827,13 +854,21 @@ try {
         domainQueues.set(domain, pLimit(maxConcurrentPerDomain));
     }
 
-    // Rate-limited URL processor
+    /**
+     * Processes URL with domain-based rate limiting
+     * @param {string} url - URL to process
+     * @param {number} index - Current index
+     * @param {number} total - Total number of URLs
+     * @returns {Promise<Object>} Processing result
+     */
     const processUrlWithRateLimit = async (url, index, total) => {
         const domain = extractDomain(url);
         const queue = domainQueues.get(domain);
         
         return queue(async () => {
-            // Implement delay for same domain requests
+            /**
+             * Implement delay for same domain requests
+             */
             const lastRequestTime = domainLastRequest.get(domain) || 0;
             const timeSinceLastRequest = Date.now() - lastRequestTime;
             
@@ -843,36 +878,44 @@ try {
             }
             
             domainLastRequest.set(domain, Date.now());
-            return processUrl(url, index + 1, total);
+            return processUrl(url, index, total);
         });
     };
 
-    // Run Tests with domain-aware concurrency control
+    /**
+     * Run accessibility tests with domain-aware concurrency control
+     */
     console.log(`\x1b[36mProcessing ${urls.length} URLs across ${urlsByDomain.size} domains\x1b[0m`);
     console.log(`\x1b[36mRate limiting: max ${maxConcurrentPerDomain} concurrent per domain, ${delayBetweenRequests}ms delay\x1b[0m`);
     
     let results;
     if (enableConcurrency && urls.length > 1) {
-        // Process URLs with domain-aware rate limiting
+        /**
+         * Process URLs with domain-aware rate limiting
+         */
         console.log(`\x1b[36mUsing domain-aware rate limiting with global concurrency: ${concurrency}\x1b[0m`);
         
         const globalLimit = pLimit(concurrency);
         const promises = urls.map((url, index) => 
-            globalLimit(() => processUrlWithRateLimit(url, index, urls.length))
+            globalLimit(() => processUrlWithRateLimit(url, index + 1, urls.length))
         );
         
         results = await Promise.allSettled(promises);
     } else {
-        // Process URLs sequentially with rate limiting
+        /**
+         * Process URLs sequentially with rate limiting
+         */
         const allResults = [];
         for (let i = 0; i < urls.length; i++) {
-            const result = await processUrlWithRateLimit(urls[i], i, urls.length);
+            const result = await processUrlWithRateLimit(urls[i], i + 1, urls.length);
             allResults.push({ status: 'fulfilled', value: result });
         }
         results = allResults;
     }
     
-    // Report processing results
+    /**
+     * Report processing results
+     */
     const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
     const failed = results.length - successful;
     
@@ -915,7 +958,9 @@ try {
  * @throws {Error} When invalid parameters are provided
  */
 async function generateHtmlReport(url, results, screenshotRelativePath, locale, templatePath, stylesPath) {
-    // Validate input parameters
+    /**
+     * Validate input parameters
+     */
     if (!isValidUrl(url)) {
         throw new Error('Invalid URL provided to generateHtmlReport');
     }
@@ -924,7 +969,9 @@ async function generateHtmlReport(url, results, screenshotRelativePath, locale, 
         throw new Error('Invalid results object provided to generateHtmlReport');
     }
     
-    // Validate screenshot path to prevent XSS and path traversal
+    /**
+     * Validate screenshot path to prevent XSS and path traversal
+     */
     if (screenshotRelativePath !== null && typeof screenshotRelativePath !== 'string') {
         throw new Error('Invalid screenshot path provided to generateHtmlReport');
     }
@@ -1078,7 +1125,9 @@ async function generateHtmlReport(url, results, screenshotRelativePath, locale, 
         `).join('');
     }
 
-    // Generate screenshot content with external file reference for better performance
+    /**
+     * Generate screenshot content with external file reference
+     */
     const screenshotContent = screenshotRelativePath 
         ? `<img src="${escapeHtml(screenshotRelativePath)}" alt="${escapeHtml(translate('labelImgAlt'))}" loading="lazy">`
         : '<div class="no-screenshot">Screenshot disabled for memory optimization</div>';
