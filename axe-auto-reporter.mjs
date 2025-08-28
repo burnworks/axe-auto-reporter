@@ -718,7 +718,7 @@ try {
         const screenshotOptions = { 
             encoding: 'binary',
             type: screenshotFormat,
-            fullPage: true,
+            fullPage: false,
             ...(screenshotFormat !== 'png' && { quality: screenshotQuality })
         };
         return await page.screenshot(screenshotOptions);
