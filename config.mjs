@@ -39,6 +39,11 @@
  * @property {string} templatePath - Path to HTML template file
  * @property {string} stylesPath - Path to CSS styles file
  * @property {number} jsonIndentation - Number of spaces for JSON pretty printing
+ * @property {number} navigationTimeout - Navigation timeout in milliseconds
+ * @property {string[]} allowedDomains - Allowed domains for URL testing (empty array allows all)
+ * @property {string[]} blockedDomains - Blocked domains for URL testing
+ * @property {boolean} enableSandbox - Enable browser sandbox for security
+ * @property {number} maxPageSize - Maximum page size in bytes (0 = unlimited)
  */
 
 /**
@@ -93,4 +98,20 @@ export default {
     // Output formatting
     /** Number of spaces for JSON pretty printing */
     jsonIndentation: 2,
+    
+    // Security settings
+    /** Navigation timeout in milliseconds */
+    navigationTimeout: 30000,
+    
+    /** Allowed domains for URL testing (empty array allows all) */
+    allowedDomains: [],
+    
+    /** Blocked domains for URL testing */
+    blockedDomains: ['localhost', '127.0.0.1', '0.0.0.0', '::1'],
+    
+    /** Enable browser sandbox for security */
+    enableSandbox: true,
+    
+    /** Maximum page size in bytes (0 = unlimited) */
+    maxPageSize: 50 * 1024 * 1024, // 50MB
 };
