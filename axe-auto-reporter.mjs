@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Automated accessibility testing script using axe-core and Puppeteer
+ * @version 2.0.2
+ * @author burnworks
+ * @requires node >=22.0.0
+ */
+
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import puppeteer from 'puppeteer';
 import { loadPage } from '@axe-core/puppeteer';
@@ -5,18 +12,51 @@ import AXELOCALES_JA from 'axe-core/locales/ja.json' with { type: 'json' };
 import path from 'path';
 import config from './config.mjs';
 
-// Viewport settings
+/**
+ * @typedef {Object} Viewport
+ * @property {number} width - Viewport width in pixels
+ * @property {number} height - Viewport height in pixels
+ */
+
+/**
+ * Predefined viewport configurations for different device types
+ * @type {Object.<string, Viewport>}
+ */
 const VIEWPORTS = {
+    /** Desktop/PC viewport (1024x768) */
     PC: { width: 1024, height: 768 },
+    /** Mobile viewport (375x812) */
     MOBILE: { width: 375, height: 812 }
 };
 
-// Configure
+/**
+ * @typedef {Object} ProcessedConfiguration
+ * @property {string} urlList - Path to the file containing URLs to test
+ * @property {Object} localeData - Locale data for axe-core
+ * @property {string[]} tags - Array of axe-core tags
+ * @property {string} locale - Current locale setting
+ * @property {Viewport} viewport - Viewport configuration
+ * @property {number} concurrency - Concurrency level
+ * @property {boolean} enableConcurrency - Concurrency enabled flag
+ * @property {string} screenshotFormat - Screenshot format
+ * @property {number} screenshotQuality - Screenshot quality
+ * @property {boolean} enableScreenshots - Screenshots enabled flag
+ */
+
+/**
+ * Processes and validates the configuration, adding derived properties
+ * @returns {ProcessedConfiguration} Processed configuration object
+ * @throws {Error} When invalid mode is specified
+ */
 const reportConfigure = () => {
     const newConfig = { ...config };
+    
+    // Add locale data based on selected locale
     if (newConfig.locale === 'ja') {
         newConfig.localeData = AXELOCALES_JA;
     }
+    
+    // Set viewport based on mode
     if (newConfig.mode === 'pc') {
         newConfig.viewport = VIEWPORTS.PC;
     } else if (newConfig.mode === 'mobile') {
@@ -25,12 +65,21 @@ const reportConfigure = () => {
         console.error('\x1b[31mInvalid mode specified\x1b[0m');
         throw new Error('Invalid mode specified');
     }
+    
     return newConfig;
 };
 
-// Global Error Handling
+/**
+ * Global browser instance for cleanup purposes
+ * @type {import('puppeteer').Browser|null}
+ */
 let browser;
 
+/**
+ * Cleanup function to properly close browser resources
+ * @async
+ * @returns {Promise<void>}
+ */
 const cleanup = async () => {
     if (browser) {
         try {
@@ -71,12 +120,21 @@ process.on('SIGTERM', async () => {
     process.exit(0);
 });
 
-// Folder existence check and creation
+/**
+ * Ensures that a directory exists, creating it if necessary
+ * @async
+ * @param {string} dir - Directory path to create
+ * @returns {Promise<void>}
+ */
 const ensureDirectoryExists = async (dir) => {
     await mkdir(dir, { recursive: true });
 };
 
-// Input validation helpers
+/**
+ * Validates if a string is a valid URL
+ * @param {any} url - URL to validate
+ * @returns {boolean} True if valid URL, false otherwise
+ */
 const isValidUrl = (url) => {
     if (typeof url !== 'string' || !url.trim()) return false;
     try {
@@ -87,11 +145,28 @@ const isValidUrl = (url) => {
     }
 };
 
+/**
+ * Validates if a value is a non-empty string
+ * @param {any} str - String to validate
+ * @returns {boolean} True if valid non-empty string, false otherwise
+ */
 const isValidString = (str) => typeof str === 'string' && str.trim().length > 0;
 
+/**
+ * Validates if a value is a number within specified range
+ * @param {any} num - Number to validate
+ * @param {number} [min=0] - Minimum allowed value
+ * @param {number} [max=Infinity] - Maximum allowed value
+ * @returns {boolean} True if valid number in range, false otherwise
+ */
 const isValidNumber = (num, min = 0, max = Infinity) => 
     typeof num === 'number' && !isNaN(num) && num >= min && num <= max;
 
+/**
+ * Validates the configuration object
+ * @param {Object} config - Configuration object to validate
+ * @returns {string[]} Array of validation error messages (empty if valid)
+ */
 const validateConfig = (config) => {
     const errors = [];
     
@@ -122,7 +197,11 @@ const validateConfig = (config) => {
     return errors;
 };
 
-// HTML escape
+/**
+ * Escapes HTML special characters to prevent XSS
+ * @param {any} unsafe - Input to escape (will be converted to string)
+ * @returns {string} HTML-escaped string
+ */
 const escapeHtml = (unsafe) => {
     if (typeof unsafe !== 'string') {
         console.warn('escapeHtml received non-string input:', typeof unsafe);
@@ -394,7 +473,24 @@ try {
     process.exit(1);
 }
 
-// Generate HTML
+/**
+ * @typedef {Object} AxeResults
+ * @property {Object[]} violations - Array of accessibility violations
+ * @property {Object[]} passes - Array of passed accessibility tests
+ * @property {Object[]} incomplete - Array of incomplete tests
+ * @property {Object[]} inapplicable - Array of inapplicable tests
+ */
+
+/**
+ * Generates HTML report from axe test results
+ * @async
+ * @param {string} url - URL that was tested
+ * @param {AxeResults} results - Axe test results object
+ * @param {string} screenshotBase64 - Base64 encoded screenshot
+ * @param {string} locale - Locale for the report
+ * @returns {Promise<string>} Generated HTML content
+ * @throws {Error} When invalid parameters are provided
+ */
 async function generateHtmlReport(url, results, screenshotBase64, locale) {
     // Validate input parameters
     if (!isValidUrl(url)) {
