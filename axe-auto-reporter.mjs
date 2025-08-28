@@ -194,6 +194,22 @@ const validateConfig = (config) => {
         errors.push('enableConcurrency must be a boolean');
     }
     
+    if (Object.hasOwn(config, 'outputDirectory') && !isValidString(config.outputDirectory)) {
+        errors.push('outputDirectory must be a non-empty string');
+    }
+    
+    if (Object.hasOwn(config, 'templatePath') && !isValidString(config.templatePath)) {
+        errors.push('templatePath must be a non-empty string');
+    }
+    
+    if (Object.hasOwn(config, 'stylesPath') && !isValidString(config.stylesPath)) {
+        errors.push('stylesPath must be a non-empty string');
+    }
+    
+    if (Object.hasOwn(config, 'jsonIndentation') && !isValidNumber(config.jsonIndentation, 0, 10)) {
+        errors.push('jsonIndentation must be a number between 0 and 10');
+    }
+    
     return errors;
 };
 
@@ -239,7 +255,11 @@ try {
         enableConcurrency, 
         screenshotFormat = 'jpeg',
         screenshotQuality = 80,
-        enableScreenshots = true
+        enableScreenshots = true,
+        outputDirectory = 'results',
+        templatePath = 'template/template.html',
+        stylesPath = 'template/styles.css',
+        jsonIndentation = 2
     } = config;
 
     // Puppeteer launch with memory optimizations
@@ -287,17 +307,16 @@ try {
     
     console.log(`\x1b[36mFound ${urls.length} valid URLs to process\x1b[0m`);
 
-    // Create a 'results' directory if it doesn't exist
-    const resultsFolder = 'results';
-    await ensureDirectoryExists(resultsFolder);
+    // Create output directory if it doesn't exist
+    await ensureDirectoryExists(outputDirectory);
 
-    // Create a folder inside 'results' based on the current datetime (`yyyy-mm-dd_hh-mm-ss`)
+    // Create a folder inside output directory based on the current datetime (`yyyy-mm-dd_hh-mm-ss`)
     const now = new Date();
     const dateTimeFolder = now.toISOString()
         .slice(0, 19)
         .replace('T', '_')
         .replace(/:/g, '-');
-    const folderName = path.join(resultsFolder, dateTimeFolder);
+    const folderName = path.join(outputDirectory, dateTimeFolder);
     await ensureDirectoryExists(folderName);
 
     // Create subdirectories for JSON and HTML files inside the dateTime folder
@@ -369,7 +388,7 @@ try {
             // Save results to an external JSON file (eg. example.com_pathname.json)
             // Use streaming for large JSON to reduce memory usage
             const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
-            const jsonData = JSON.stringify(results, null, 2);
+            const jsonData = JSON.stringify(results, null, jsonIndentation);
             await writeFile(jsonFilename, jsonData, 'utf-8');
             
             // Clear reference to help garbage collection
@@ -383,7 +402,7 @@ try {
 
             // Save results to an external HTML file (eg. example.com_pathname.html)
             const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
-            const htmlContent = await generateHtmlReport(url, results, screenshotBase64, locale);
+            const htmlContent = await generateHtmlReport(url, results, screenshotBase64, locale, templatePath, stylesPath);
             
             if (!isValidString(htmlContent)) {
                 throw new Error('Failed to generate valid HTML content');
@@ -488,10 +507,12 @@ try {
  * @param {AxeResults} results - Axe test results object
  * @param {string} screenshotBase64 - Base64 encoded screenshot
  * @param {string} locale - Locale for the report
+ * @param {string} templatePath - Path to HTML template file
+ * @param {string} stylesPath - Path to CSS styles file
  * @returns {Promise<string>} Generated HTML content
  * @throws {Error} When invalid parameters are provided
  */
-async function generateHtmlReport(url, results, screenshotBase64, locale) {
+async function generateHtmlReport(url, results, screenshotBase64, locale, templatePath, stylesPath) {
     // Validate input parameters
     if (!isValidUrl(url)) {
         throw new Error('Invalid URL provided to generateHtmlReport');
@@ -507,6 +528,14 @@ async function generateHtmlReport(url, results, screenshotBase64, locale) {
     
     if (!isValidString(locale)) {
         throw new Error('Invalid locale provided to generateHtmlReport');
+    }
+    
+    if (!isValidString(templatePath)) {
+        throw new Error('Invalid template path provided to generateHtmlReport');
+    }
+    
+    if (!isValidString(stylesPath)) {
+        throw new Error('Invalid styles path provided to generateHtmlReport');
     }
     const translations = {
         ja: {
@@ -564,8 +593,8 @@ async function generateHtmlReport(url, results, screenshotBase64, locale) {
         return Object.hasOwn(keys, key) ? keys[key] : 'Translation missing';
     };
 
-    const template = await readFile('template/template.html', 'utf-8');
-    const cssContent = await readFile('template/styles.css', 'utf-8');
+    const template = await readFile(templatePath, 'utf-8');
+    const cssContent = await readFile(stylesPath, 'utf-8');
 
     let impactListHtml;
     let violationHtml;
