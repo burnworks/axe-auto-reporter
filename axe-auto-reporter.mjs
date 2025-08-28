@@ -90,7 +90,7 @@ const escapeHtml = unsafe => (
 try {
 
     // Load configure
-    const { urlList, localeData, tags, locale, viewport } = reportConfigure();
+    const { urlList, localeData, tags, locale, viewport, concurrency, enableConcurrency } = reportConfigure();
 
     // Puppeteer launch
     browser = await puppeteer.launch({
@@ -126,16 +126,14 @@ try {
     // Sanitize file name
     const sanitizeFilenamePart = (str) => str.replace(/[^a-zA-Z0-9\-_.]/g, '_');
 
-    // Set count for progress
-    let processedCount = 0;
-
-    // Run Tests
-    for (const url of urls) {
-        if (typeof url !== 'string') continue;
+    // Process single URL with axe testing
+    const processUrl = async (url, index, total) => {
+        if (typeof url !== 'string') return { url, success: false, error: 'Invalid URL type' };
+        
         let page;
         try {
             // Output progress (start)
-            console.log(`Processing ${processedCount + 1}/${urls.length}: ${url}`);
+            console.log(`Processing ${index}/${total}: ${url}`);
 
             // Load page
             const axeBuilder = await loadPage(browser, url.trim());
@@ -164,8 +162,8 @@ try {
             await writeFile(htmlFilename, htmlContent, 'utf-8');
 
             // Output progress (complete)
-            processedCount++;
-            console.log(`\x1b[32mCompleted!\x1b[0m ${processedCount}/${urls.length}: ${url}`);
+            console.log(`\x1b[32mCompleted!\x1b[0m ${index}/${total}: ${url}`);
+            return { url, success: true };
         } catch (error) {
             const errorInfo = {
                 url,
@@ -178,13 +176,51 @@ try {
             console.error(`\x1b[31mFailed to process URL:\x1b[0m ${url}`);
             console.error('Error details:', errorInfo);
             
-            // Continue processing other URLs instead of stopping
-            processedCount++;
+            return { url, success: false, error: errorInfo };
         } finally {
             if (page && !page.isClosed()) {
                 await page.close();
             }
         }
+    };
+
+    // Run Tests with concurrency control
+    console.log(`\x1b[36mProcessing ${urls.length} URLs${enableConcurrency ? ` with concurrency: ${concurrency}` : ' sequentially'}\x1b[0m`);
+    
+    let results;
+    if (enableConcurrency && urls.length > 1) {
+        // Process URLs concurrently in batches
+        const allResults = [];
+        
+        for (let i = 0; i < urls.length; i += concurrency) {
+            const batch = urls.slice(i, i + concurrency);
+            const batchPromises = batch.map((url, batchIndex) => 
+                processUrl(url, i + batchIndex + 1, urls.length)
+            );
+            
+            const batchResults = await Promise.allSettled(batchPromises);
+            allResults.push(...batchResults);
+        }
+        
+        results = allResults;
+    } else {
+        // Process URLs sequentially
+        const allResults = [];
+        for (let i = 0; i < urls.length; i++) {
+            const result = await processUrl(urls[i], i + 1, urls.length);
+            allResults.push({ status: 'fulfilled', value: result });
+        }
+        results = allResults;
+    }
+    
+    // Report processing results
+    const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+    const failed = results.length - successful;
+    
+    console.log(`\x1b[32mProcessing completed!\x1b[0m`);
+    console.log(`✅ Successful: ${successful}`);
+    if (failed > 0) {
+        console.log(`❌ Failed: ${failed}`);
     }
 
     await cleanup();
