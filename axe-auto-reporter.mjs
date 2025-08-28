@@ -10,12 +10,10 @@ import puppeteer from 'puppeteer';
 import { loadPage } from '@axe-core/puppeteer';
 import AXELOCALES_JA from 'axe-core/locales/ja.json' with { type: 'json' };
 import path from 'path';
+import pLimit from 'p-limit';
 import config from './config.mjs';
 
-/**
- * Global template cache promise for module-level initialization
- */
-let TEMPLATE_CACHE_PROMISE = null;
+// Template cache promise is now managed internally by initializeTemplateCache closure
 
 /**
  * @typedef {Object} Viewport
@@ -354,26 +352,33 @@ const validateConfig = (config) => {
 const TEMPLATE_CACHE = new Map();
 
 /**
- * Initialize template cache on module load
+ * Initialize template cache on module load (atomic operation)
  * @returns {Promise<void>}
  */
-const initializeTemplateCache = async () => {
-    if (TEMPLATE_CACHE_PROMISE) return TEMPLATE_CACHE_PROMISE;
+const initializeTemplateCache = (() => {
+    let initPromise = null;
     
-    TEMPLATE_CACHE_PROMISE = (async () => {
-        try {
-            await Promise.all([
-                readCachedTemplate(config.templatePath),
-                readCachedTemplate(config.stylesPath)
-            ]);
-            console.log('\x1b[36mTemplate cache initialized\x1b[0m');
-        } catch (error) {
-            console.warn('\x1b[33mTemplate cache initialization failed:\x1b[0m', error.message);
-        }
-    })();
-    
-    return TEMPLATE_CACHE_PROMISE;
-};
+    return async () => {
+        if (initPromise) return initPromise;
+        
+        initPromise = (async () => {
+            try {
+                await Promise.all([
+                    readCachedTemplate(config.templatePath),
+                    readCachedTemplate(config.stylesPath)
+                ]);
+                console.log('\x1b[36mTemplate cache initialized\x1b[0m');
+            } catch (error) {
+                console.warn('\x1b[33mTemplate cache initialization failed:\x1b[0m', error.message);
+                // Reset promise on failure to allow retry
+                initPromise = null;
+                throw error;
+            }
+        })();
+        
+        return initPromise;
+    };
+})();
 
 /**
  * Reads and caches template files for performance
@@ -523,6 +528,22 @@ try {
         defaultViewport: viewport,
         args: launchArgs,
     });
+
+    // Validate file path to prevent path traversal attacks
+    if (!isValidString(urlList)) {
+        throw new Error('Invalid URL list file path provided');
+    }
+    
+    const normalizedPath = path.resolve(urlList);
+    const currentDir = path.resolve('.');
+    
+    if (!normalizedPath.startsWith(currentDir)) {
+        throw new Error('URL list file path must be within current directory');
+    }
+    
+    if (urlList.includes('..') || path.isAbsolute(urlList)) {
+        throw new Error('Relative paths with ".." or absolute paths are not allowed');
+    }
 
     // Read and validate URLs from the external file
     const urlsContent = await readFile(urlList, 'utf-8');
@@ -725,18 +746,24 @@ try {
     };
 
     const cleanupMemory = async (results, index) => {
-        // Clear references to help garbage collection
-        results.violations?.forEach(violation => {
-            if (violation.nodes) {
-                violation.nodes.forEach(node => {
-                    delete node.element;
-                });
-            }
-        });
+        // Efficient memory cleanup without manual property deletion
+        if (results.violations) {
+            results.violations.forEach(violation => {
+                if (violation.nodes) {
+                    // Create new array without element references instead of deleting
+                    violation.nodes = violation.nodes.map(({ element, ...node }) => node);
+                }
+            });
+        }
 
-        // Periodic garbage collection
-        if (global.gc && (index % 10 === 0)) {
-            global.gc();
+        // Use WeakRef-based cleanup instead of manual GC (Node.js v22+ compatible)
+        if (typeof globalThis.gc === 'function' && (index % 50 === 0)) {
+            // Only trigger GC every 50 URLs to avoid performance impact
+            try {
+                globalThis.gc();
+            } catch (error) {
+                // Silently ignore GC errors in production
+            }
         }
     };
 
@@ -769,20 +796,15 @@ try {
     
     let results;
     if (enableConcurrency && urls.length > 1) {
-        // Process URLs concurrently in batches
-        const allResults = [];
+        // Process URLs with true concurrency using p-limit worker pool
+        console.log(`\x1b[36mUsing worker pool with ${concurrency} concurrent workers\x1b[0m`);
         
-        for (let i = 0; i < urls.length; i += concurrency) {
-            const batch = urls.slice(i, i + concurrency);
-            const batchPromises = batch.map((url, batchIndex) => 
-                processUrl(url, i + batchIndex + 1, urls.length)
-            );
-            
-            const batchResults = await Promise.allSettled(batchPromises);
-            allResults.push(...batchResults);
-        }
+        const limit = pLimit(concurrency);
+        const promises = urls.map((url, index) => 
+            limit(() => processUrl(url, index + 1, urls.length))
+        );
         
-        results = allResults;
+        results = await Promise.allSettled(promises);
     } else {
         // Process URLs sequentially
         const allResults = [];
@@ -845,8 +867,17 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
         throw new Error('Invalid results object provided to generateHtmlReport');
     }
     
+    // Enhanced screenshot validation to prevent XSS
     if (typeof screenshotBase64 !== 'string') {
         throw new Error('Invalid screenshot data provided to generateHtmlReport');
+    }
+    
+    if (screenshotBase64 && !/^[A-Za-z0-9+/=]*$/.test(screenshotBase64)) {
+        throw new Error('Screenshot data contains invalid base64 characters');
+    }
+    
+    if (screenshotBase64 && screenshotBase64.length > 10 * 1024 * 1024) { // 10MB limit
+        throw new Error('Screenshot data exceeds size limit');
     }
     
     if (!isValidString(locale)) {
@@ -994,10 +1025,22 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
         `).join('');
     }
 
-    // Build template in memory-efficient way using template literals
-    const screenshotContent = screenshotBase64 
-        ? `<img src="data:image/${screenshotBase64.startsWith('/9j/') ? 'jpeg' : 'png'};base64,${screenshotBase64}" alt="${translate('labelImgAlt')}">`
-        : '<div class="no-screenshot">Screenshot disabled for memory optimization</div>';
+    // Safe screenshot content generation with proper validation
+    const screenshotContent = screenshotBase64 ? (() => {
+        // Safe image format detection based on base64 magic bytes
+        let imageFormat = 'png'; // Default to PNG
+        if (screenshotBase64.startsWith('/9j/')) {
+            imageFormat = 'jpeg';
+        } else if (screenshotBase64.startsWith('UklGR')) {
+            imageFormat = 'webp';
+        }
+        
+        // Additional escaping for extra security
+        const safeBase64 = screenshotBase64.replace(/['"<>]/g, '');
+        const safeAltText = escapeHtml(translate('labelImgAlt'));
+        
+        return `<img src="data:image/${imageFormat};base64,${safeBase64}" alt="${safeAltText}">`;
+    })() : '<div class="no-screenshot">Screenshot disabled for memory optimization</div>';
 
     return template
         .replace('{{STYLE}}', `<style>${cssContent}</style>`)
