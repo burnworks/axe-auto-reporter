@@ -811,9 +811,9 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
     const translate = (key, subkey) => {
         const keys = Object.hasOwn(translations, locale) ? translations[locale] : translations.ja;
         if (subkey) {
-            return (Object.hasOwn(keys, key) && Object.hasOwn(keys[key], subkey)) 
+            return (Object.hasOwn(keys, key) && keys[key] && Object.hasOwn(keys[key], subkey)) 
                 ? keys[key][subkey] 
-                : (Object.hasOwn(keys, key) ? keys[key] : 'Translation missing');
+                : 'Translation missing';
         }
         return Object.hasOwn(keys, key) ? keys[key] : 'Translation missing';
     };
