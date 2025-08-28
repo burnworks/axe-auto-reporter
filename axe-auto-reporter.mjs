@@ -76,21 +76,81 @@ const ensureDirectoryExists = async (dir) => {
     await mkdir(dir, { recursive: true });
 };
 
+// Input validation helpers
+const isValidUrl = (url) => {
+    if (typeof url !== 'string' || !url.trim()) return false;
+    try {
+        new URL(url.trim());
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const isValidString = (str) => typeof str === 'string' && str.trim().length > 0;
+
+const isValidNumber = (num, min = 0, max = Infinity) => 
+    typeof num === 'number' && !isNaN(num) && num >= min && num <= max;
+
+const validateConfig = (config) => {
+    const errors = [];
+    
+    if (!isValidString(config.urlList)) {
+        errors.push('urlList must be a non-empty string');
+    }
+    
+    if (!isValidString(config.locale)) {
+        errors.push('locale must be a non-empty string');
+    }
+    
+    if (!Array.isArray(config.tags) || config.tags.length === 0) {
+        errors.push('tags must be a non-empty array');
+    }
+    
+    if (!isValidString(config.mode)) {
+        errors.push('mode must be a non-empty string');
+    }
+    
+    if (Object.hasOwn(config, 'concurrency') && !isValidNumber(config.concurrency, 1, 10)) {
+        errors.push('concurrency must be a number between 1 and 10');
+    }
+    
+    if (Object.hasOwn(config, 'enableConcurrency') && typeof config.enableConcurrency !== 'boolean') {
+        errors.push('enableConcurrency must be a boolean');
+    }
+    
+    return errors;
+};
+
 // HTML escape
-const escapeHtml = unsafe => (
-    unsafe
+const escapeHtml = (unsafe) => {
+    if (typeof unsafe !== 'string') {
+        console.warn('escapeHtml received non-string input:', typeof unsafe);
+        return String(unsafe);
+    }
+    
+    return unsafe
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;')
-        .replace(/\n/g, '<br>')
-);
+        .replace(/\n/g, '<br>');
+};
 
 try {
 
-    // Load configure
-    const { urlList, localeData, tags, locale, viewport, concurrency, enableConcurrency } = reportConfigure();
+    // Load and validate configure
+    const config = reportConfigure();
+    const configErrors = validateConfig(config);
+    
+    if (configErrors.length > 0) {
+        console.error('\x1b[31mConfiguration validation errors:\x1b[0m');
+        configErrors.forEach(error => console.error(`  - ${error}`));
+        throw new Error('Invalid configuration');
+    }
+    
+    const { urlList, localeData, tags, locale, viewport, concurrency, enableConcurrency } = config;
 
     // Puppeteer launch
     browser = await puppeteer.launch({
@@ -98,9 +158,33 @@ try {
         defaultViewport: viewport,
     });
 
-    // Read URLs from the external file
+    // Read and validate URLs from the external file
     const urlsContent = await readFile(urlList, 'utf-8');
-    const urls = urlsContent.split('\n').filter(Boolean);
+    const rawUrls = urlsContent.split('\n').filter(Boolean);
+    
+    // Validate URLs
+    const urls = [];
+    const invalidUrls = [];
+    
+    for (const rawUrl of rawUrls) {
+        const trimmedUrl = rawUrl.trim();
+        if (isValidUrl(trimmedUrl)) {
+            urls.push(trimmedUrl);
+        } else if (trimmedUrl) {
+            invalidUrls.push(trimmedUrl);
+        }
+    }
+    
+    if (invalidUrls.length > 0) {
+        console.warn('\x1b[33mInvalid URLs found and will be skipped:\x1b[0m');
+        invalidUrls.forEach(url => console.warn(`  - ${url}`));
+    }
+    
+    if (urls.length === 0) {
+        throw new Error('No valid URLs found in the URL list file');
+    }
+    
+    console.log(`\x1b[36mFound ${urls.length} valid URLs to process\x1b[0m`);
 
     // Create a 'results' directory if it doesn't exist
     const resultsFolder = 'results';
@@ -128,7 +212,14 @@ try {
 
     // Process single URL with axe testing
     const processUrl = async (url, index, total) => {
-        if (typeof url !== 'string') return { url, success: false, error: 'Invalid URL type' };
+        // Validate input parameters
+        if (!isValidUrl(url)) {
+            return { url, success: false, error: 'Invalid URL format' };
+        }
+        
+        if (!isValidNumber(index, 1) || !isValidNumber(total, 1)) {
+            return { url, success: false, error: 'Invalid index or total parameters' };
+        }
         
         let page;
         try {
@@ -145,12 +236,26 @@ try {
             // Get test results
             const results = await axeBuilder.configure({ locale: localeData }).withTags(tags).analyze();
 
-            // Create file name
+            // Validate axe results
+            if (!results || typeof results !== 'object') {
+                throw new Error('Invalid axe test results received');
+            }
+
+            // Create file name with validation
             const parsedURL = new URL(url);
             const domain = parsedURL.hostname;
+            
+            if (!isValidString(domain)) {
+                throw new Error('Invalid domain extracted from URL');
+            }
+            
             const pathName = sanitizeFilenamePart(parsedURL.pathname.slice(1).replace(/\/$/g, ''));
             const queryString = sanitizeFilenamePart(parsedURL.search.slice(1));
             const baseFilename = `${domain}${pathName ? `_${pathName}` : ''}${queryString ? `_${queryString}` : ''}`;
+            
+            if (!isValidString(baseFilename)) {
+                throw new Error('Failed to generate valid filename');
+            }
 
             // Save results to an external JSON file (eg. example.com_pathname.json)
             const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
@@ -159,6 +264,11 @@ try {
             // Save results to an external HTML file (eg. example.com_pathname.html)
             const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
             const htmlContent = await generateHtmlReport(url, results, screenshotBase64, locale);
+            
+            if (!isValidString(htmlContent)) {
+                throw new Error('Failed to generate valid HTML content');
+            }
+            
             await writeFile(htmlFilename, htmlContent, 'utf-8');
 
             // Output progress (complete)
@@ -237,6 +347,22 @@ try {
 
 // Generate HTML
 async function generateHtmlReport(url, results, screenshotBase64, locale) {
+    // Validate input parameters
+    if (!isValidUrl(url)) {
+        throw new Error('Invalid URL provided to generateHtmlReport');
+    }
+    
+    if (!results || typeof results !== 'object') {
+        throw new Error('Invalid results object provided to generateHtmlReport');
+    }
+    
+    if (typeof screenshotBase64 !== 'string') {
+        throw new Error('Invalid screenshot data provided to generateHtmlReport');
+    }
+    
+    if (!isValidString(locale)) {
+        throw new Error('Invalid locale provided to generateHtmlReport');
+    }
     const translations = {
         ja: {
             labelTitle: 'アクセシビリティレポート',
