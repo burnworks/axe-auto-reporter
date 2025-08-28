@@ -150,12 +150,34 @@ try {
         throw new Error('Invalid configuration');
     }
     
-    const { urlList, localeData, tags, locale, viewport, concurrency, enableConcurrency } = config;
+    const { 
+        urlList, 
+        localeData, 
+        tags, 
+        locale, 
+        viewport, 
+        concurrency, 
+        enableConcurrency, 
+        screenshotFormat = 'jpeg',
+        screenshotQuality = 80,
+        enableScreenshots = true
+    } = config;
 
-    // Puppeteer launch
+    // Puppeteer launch with memory optimizations
     browser = await puppeteer.launch({
         headless: 'new',
         defaultViewport: viewport,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', // Use disk instead of shared memory
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu',
+            '--memory-pressure-off', // Disable memory pressure detection
+            '--max_old_space_size=2048', // Limit Node.js memory usage
+        ],
     });
 
     // Read and validate URLs from the external file
@@ -230,8 +252,16 @@ try {
             const axeBuilder = await loadPage(browser, url.trim());
             page = axeBuilder.page;
 
-            // Get a screenshot of the page in Base64 format
-            const screenshotBase64 = await page.screenshot({ encoding: 'base64' });
+            // Get a screenshot of the page with memory optimization
+            let screenshotBase64 = '';
+            if (enableScreenshots) {
+                const screenshotOptions = { 
+                    encoding: 'base64',
+                    type: screenshotFormat,
+                    ...(screenshotFormat !== 'png' && { quality: screenshotQuality })
+                };
+                screenshotBase64 = await page.screenshot(screenshotOptions);
+            }
 
             // Get test results
             const results = await axeBuilder.configure({ locale: localeData }).withTags(tags).analyze();
@@ -258,8 +288,19 @@ try {
             }
 
             // Save results to an external JSON file (eg. example.com_pathname.json)
+            // Use streaming for large JSON to reduce memory usage
             const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
-            await writeFile(jsonFilename, JSON.stringify(results, null, 2), 'utf-8');
+            const jsonData = JSON.stringify(results, null, 2);
+            await writeFile(jsonFilename, jsonData, 'utf-8');
+            
+            // Clear reference to help garbage collection
+            results.violations?.forEach(violation => {
+                if (violation.nodes) {
+                    violation.nodes.forEach(node => {
+                        delete node.element;
+                    });
+                }
+            });
 
             // Save results to an external HTML file (eg. example.com_pathname.html)
             const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
@@ -271,6 +312,9 @@ try {
             
             await writeFile(htmlFilename, htmlContent, 'utf-8');
 
+            // Clear large variables to help garbage collection
+            screenshotBase64 = null;
+            
             // Output progress (complete)
             console.log(`\x1b[32mCompleted!\x1b[0m ${index}/${total}: ${url}`);
             return { url, success: true };
@@ -290,6 +334,11 @@ try {
         } finally {
             if (page && !page.isClosed()) {
                 await page.close();
+            }
+            
+            // Force garbage collection hint (Node.js will decide if needed)
+            if (global.gc && Math.random() < 0.1) { // 10% chance to suggest GC
+                global.gc();
             }
         }
     };
@@ -536,6 +585,11 @@ async function generateHtmlReport(url, results, screenshotBase64, locale) {
         `).join('');
     }
 
+    // Build template in memory-efficient way using template literals
+    const screenshotContent = screenshotBase64 
+        ? `<img src="data:image/${screenshotBase64.startsWith('/9j/') ? 'jpeg' : 'png'};base64,${screenshotBase64}" alt="${translate('labelImgAlt')}">`
+        : '<div class="no-screenshot">Screenshot disabled for memory optimization</div>';
+
     return template
         .replace('{{STYLE}}', `<style>${cssContent}</style>`)
         .replace('{{LOCALE}}', locale)
@@ -553,7 +607,7 @@ async function generateHtmlReport(url, results, screenshotBase64, locale) {
         .replace('{{CONTENT}}', `
             <div class="main-contents">
                 <div class="screenshot">
-                    <img src="data:image/png;base64,${screenshotBase64}" alt="${translate('labelImgAlt')}">
+                    ${screenshotContent}
                 </div>
                 <div class="violation">
                     <div class="violationHeader">
