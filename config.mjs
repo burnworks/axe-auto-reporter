@@ -32,6 +32,8 @@
  * @property {ViewportMode} mode - Viewport mode for browser emulation
  * @property {number} concurrency - Number of URLs to process concurrently (1-10)
  * @property {boolean} enableConcurrency - Enable/disable concurrent processing
+ * @property {number} maxConcurrentPerDomain - Maximum concurrent requests per domain (1-3)
+ * @property {number} delayBetweenRequests - Delay between requests to same domain in milliseconds
  * @property {ScreenshotFormat} screenshotFormat - Format for screenshots
  * @property {number} screenshotQuality - Quality for JPEG/WebP screenshots (0-100)
  * @property {boolean} enableScreenshots - Enable/disable screenshot capture
@@ -76,6 +78,12 @@ export default {
     
     /** Enable/disable concurrent processing */
     enableConcurrency: true,
+    
+    /** Maximum concurrent requests per domain (1-3) */
+    maxConcurrentPerDomain: 1,
+    
+    /** Delay between requests to same domain in milliseconds (1000-3000ms recommended) */
+    delayBetweenRequests: 3000,
     
     /** 
      * Memory optimization settings 

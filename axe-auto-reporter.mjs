@@ -799,25 +799,74 @@ try {
         }
     };
 
-    // Run Tests with concurrency control
-    console.log(`\x1b[36mProcessing ${urls.length} URLs${enableConcurrency ? ` with concurrency: ${concurrency}` : ' sequentially'}\x1b[0m`);
+    // Extract domain information for rate limiting
+    const extractDomain = (url) => {
+        try {
+            return new URL(url).hostname;
+        } catch {
+            return 'invalid-domain';
+        }
+    };
+
+    // Group URLs by domain for rate limiting
+    const urlsByDomain = new Map();
+    urls.forEach((url, index) => {
+        const domain = extractDomain(url);
+        if (!urlsByDomain.has(domain)) {
+            urlsByDomain.set(domain, []);
+        }
+        urlsByDomain.get(domain).push({ url, index });
+    });
+
+    // Create domain-specific queues for rate limiting
+    const { maxConcurrentPerDomain, delayBetweenRequests } = config;
+    const domainQueues = new Map();
+    const domainLastRequest = new Map();
+
+    for (const domain of urlsByDomain.keys()) {
+        domainQueues.set(domain, pLimit(maxConcurrentPerDomain));
+    }
+
+    // Rate-limited URL processor
+    const processUrlWithRateLimit = async (url, index, total) => {
+        const domain = extractDomain(url);
+        const queue = domainQueues.get(domain);
+        
+        return queue(async () => {
+            // Implement delay for same domain requests
+            const lastRequestTime = domainLastRequest.get(domain) || 0;
+            const timeSinceLastRequest = Date.now() - lastRequestTime;
+            
+            if (timeSinceLastRequest < delayBetweenRequests) {
+                const delayNeeded = delayBetweenRequests - timeSinceLastRequest;
+                await new Promise(resolve => setTimeout(resolve, delayNeeded));
+            }
+            
+            domainLastRequest.set(domain, Date.now());
+            return processUrl(url, index + 1, total);
+        });
+    };
+
+    // Run Tests with domain-aware concurrency control
+    console.log(`\x1b[36mProcessing ${urls.length} URLs across ${urlsByDomain.size} domains\x1b[0m`);
+    console.log(`\x1b[36mRate limiting: max ${maxConcurrentPerDomain} concurrent per domain, ${delayBetweenRequests}ms delay\x1b[0m`);
     
     let results;
     if (enableConcurrency && urls.length > 1) {
-        // Process URLs with true concurrency using p-limit worker pool
-        console.log(`\x1b[36mUsing worker pool with ${concurrency} concurrent workers\x1b[0m`);
+        // Process URLs with domain-aware rate limiting
+        console.log(`\x1b[36mUsing domain-aware rate limiting with global concurrency: ${concurrency}\x1b[0m`);
         
-        const limit = pLimit(concurrency);
+        const globalLimit = pLimit(concurrency);
         const promises = urls.map((url, index) => 
-            limit(() => processUrl(url, index + 1, urls.length))
+            globalLimit(() => processUrlWithRateLimit(url, index, urls.length))
         );
         
         results = await Promise.allSettled(promises);
     } else {
-        // Process URLs sequentially
+        // Process URLs sequentially with rate limiting
         const allResults = [];
         for (let i = 0; i < urls.length; i++) {
-            const result = await processUrl(urls[i], i + 1, urls.length);
+            const result = await processUrlWithRateLimit(urls[i], i, urls.length);
             allResults.push({ status: 'fulfilled', value: result });
         }
         results = allResults;
