@@ -146,6 +146,45 @@ const isValidUrl = (url) => {
 };
 
 /**
+ * Validates URL against security policies (allowed/blocked domains)
+ * @param {string} url - URL to validate
+ * @param {string[]} allowedDomains - List of allowed domains (empty = allow all)
+ * @param {string[]} blockedDomains - List of blocked domains
+ * @returns {boolean} True if URL is allowed, false otherwise
+ */
+const isUrlAllowed = (url, allowedDomains, blockedDomains) => {
+    try {
+        const parsedUrl = new URL(url);
+        const hostname = parsedUrl.hostname.toLowerCase();
+        
+        // Check blocked domains first
+        for (const blockedDomain of blockedDomains) {
+            if (hostname === blockedDomain.toLowerCase() || 
+                hostname.endsWith(`.${blockedDomain.toLowerCase()}`)) {
+                return false;
+            }
+        }
+        
+        // If allowedDomains is empty, allow all (except blocked)
+        if (allowedDomains.length === 0) {
+            return true;
+        }
+        
+        // Check allowed domains
+        for (const allowedDomain of allowedDomains) {
+            if (hostname === allowedDomain.toLowerCase() || 
+                hostname.endsWith(`.${allowedDomain.toLowerCase()}`)) {
+                return true;
+            }
+        }
+        
+        return false;
+    } catch {
+        return false;
+    }
+};
+
+/**
  * Validates if a value is a non-empty string
  * @param {any} str - String to validate
  * @returns {boolean} True if valid non-empty string, false otherwise
@@ -210,6 +249,26 @@ const validateConfig = (config) => {
         errors.push('jsonIndentation must be a number between 0 and 10');
     }
     
+    if (Object.hasOwn(config, 'navigationTimeout') && !isValidNumber(config.navigationTimeout, 1000, 300000)) {
+        errors.push('navigationTimeout must be a number between 1000 and 300000 milliseconds');
+    }
+    
+    if (Object.hasOwn(config, 'allowedDomains') && !Array.isArray(config.allowedDomains)) {
+        errors.push('allowedDomains must be an array');
+    }
+    
+    if (Object.hasOwn(config, 'blockedDomains') && !Array.isArray(config.blockedDomains)) {
+        errors.push('blockedDomains must be an array');
+    }
+    
+    if (Object.hasOwn(config, 'enableSandbox') && typeof config.enableSandbox !== 'boolean') {
+        errors.push('enableSandbox must be a boolean');
+    }
+    
+    if (Object.hasOwn(config, 'maxPageSize') && !isValidNumber(config.maxPageSize, 0, 1024 * 1024 * 1024)) {
+        errors.push('maxPageSize must be a number between 0 and 1GB');
+    }
+    
     return errors;
 };
 
@@ -259,38 +318,59 @@ try {
         outputDirectory = 'results',
         templatePath = 'template/template.html',
         stylesPath = 'template/styles.css',
-        jsonIndentation = 2
+        jsonIndentation = 2,
+        navigationTimeout = 30000,
+        allowedDomains = [],
+        blockedDomains = ['localhost', '127.0.0.1', '0.0.0.0', '::1'],
+        enableSandbox = true,
+        maxPageSize = 50 * 1024 * 1024
     } = config;
 
-    // Puppeteer launch with memory optimizations
+    // Puppeteer launch with memory optimizations and security settings
+    const launchArgs = [
+        '--disable-dev-shm-usage', // Use disk instead of shared memory
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--memory-pressure-off', // Disable memory pressure detection
+        '--max_old_space_size=2048', // Limit Node.js memory usage
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images', // Disable image loading for performance and security
+        '--disable-javascript', // Will be overridden by page.setJavaScriptEnabled if needed
+        '--disable-web-security', // Only for testing, not recommended for production
+    ];
+
+    // Add sandbox settings based on configuration
+    if (!enableSandbox) {
+        launchArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+        console.warn('\x1b[33mWarning: Browser sandbox is disabled. This reduces security.\x1b[0m');
+    }
+
     browser = await puppeteer.launch({
         headless: 'new',
         defaultViewport: viewport,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage', // Use disk instead of shared memory
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-            '--memory-pressure-off', // Disable memory pressure detection
-            '--max_old_space_size=2048', // Limit Node.js memory usage
-        ],
+        args: launchArgs,
     });
 
     // Read and validate URLs from the external file
     const urlsContent = await readFile(urlList, 'utf-8');
     const rawUrls = urlsContent.split('\n').filter(Boolean);
     
-    // Validate URLs
+    // Validate URLs with security checks
     const urls = [];
     const invalidUrls = [];
+    const blockedUrls = [];
     
     for (const rawUrl of rawUrls) {
         const trimmedUrl = rawUrl.trim();
         if (isValidUrl(trimmedUrl)) {
-            urls.push(trimmedUrl);
+            if (isUrlAllowed(trimmedUrl, allowedDomains, blockedDomains)) {
+                urls.push(trimmedUrl);
+            } else {
+                blockedUrls.push(trimmedUrl);
+            }
         } else if (trimmedUrl) {
             invalidUrls.push(trimmedUrl);
         }
@@ -301,11 +381,35 @@ try {
         invalidUrls.forEach(url => console.warn(`  - ${url}`));
     }
     
+    if (blockedUrls.length > 0) {
+        console.warn('\x1b[33mBlocked URLs found and will be skipped (security policy):\x1b[0m');
+        blockedUrls.forEach(url => console.warn(`  - ${url}`));
+    }
+    
     if (urls.length === 0) {
         throw new Error('No valid URLs found in the URL list file');
     }
     
     console.log(`\x1b[36mFound ${urls.length} valid URLs to process\x1b[0m`);
+    
+    // Security status report
+    if (enableSandbox) {
+        console.log('\x1b[32mSecurity: Browser sandbox enabled\x1b[0m');
+    } else {
+        console.warn('\x1b[33mSecurity: Browser sandbox disabled\x1b[0m');
+    }
+    
+    if (allowedDomains.length > 0) {
+        console.log(`\x1b[32mSecurity: Domain allowlist active (${allowedDomains.length} domains)\x1b[0m`);
+    }
+    
+    if (blockedDomains.length > 0) {
+        console.log(`\x1b[32mSecurity: Domain blocklist active (${blockedDomains.length} domains)\x1b[0m`);
+    }
+    
+    if (maxPageSize > 0) {
+        console.log(`\x1b[32mSecurity: Page size limit set to ${Math.round(maxPageSize / 1024 / 1024)}MB\x1b[0m`);
+    }
 
     // Create output directory if it doesn't exist
     await ensureDirectoryExists(outputDirectory);
@@ -346,9 +450,28 @@ try {
             // Output progress (start)
             console.log(`Processing ${index}/${total}: ${url}`);
 
-            // Load page
-            const axeBuilder = await loadPage(browser, url.trim());
+            // Load page with security settings
+            const axeBuilder = await loadPage(browser, url.trim(), {
+                timeout: navigationTimeout
+            });
             page = axeBuilder.page;
+
+            // Set page security policies
+            await page.setDefaultNavigationTimeout(navigationTimeout);
+            await page.setDefaultTimeout(navigationTimeout);
+            
+            // Enable JavaScript for accessibility testing (required for axe-core)
+            await page.setJavaScriptEnabled(true);
+            
+            // Set response size limit
+            if (maxPageSize > 0) {
+                page.on('response', (response) => {
+                    const contentLength = response.headers()['content-length'];
+                    if (contentLength && parseInt(contentLength, 10) > maxPageSize) {
+                        throw new Error(`Page size exceeds limit: ${contentLength} bytes`);
+                    }
+                });
+            }
 
             // Get a screenshot of the page with memory optimization
             let screenshotBase64 = '';
