@@ -41,6 +41,15 @@ const VIEWPORTS = {
  * @property {string} screenshotFormat - Screenshot format
  * @property {number} screenshotQuality - Screenshot quality
  * @property {boolean} enableScreenshots - Screenshots enabled flag
+ * @property {string} outputDirectory - Directory for storing results
+ * @property {string} templatePath - Path to HTML template file
+ * @property {string} stylesPath - Path to CSS styles file
+ * @property {number} jsonIndentation - Number of spaces for JSON pretty printing
+ * @property {number} navigationTimeout - Navigation timeout in milliseconds
+ * @property {string[]} allowedDomains - Allowed domains for URL testing
+ * @property {string[]} blockedDomains - Blocked domains for URL testing
+ * @property {boolean} enableSandbox - Enable browser sandbox for security
+ * @property {number} maxPageSize - Maximum page size in bytes
  */
 
 /**
@@ -51,12 +60,10 @@ const VIEWPORTS = {
 const reportConfigure = () => {
     const newConfig = { ...config };
     
-    // Add locale data based on selected locale
     if (newConfig.locale === 'ja') {
         newConfig.localeData = AXELOCALES_JA;
     }
     
-    // Set viewport based on mode
     if (newConfig.mode === 'pc') {
         newConfig.viewport = VIEWPORTS.PC;
     } else if (newConfig.mode === 'mobile') {
@@ -146,10 +153,70 @@ const isValidUrl = (url) => {
 };
 
 /**
+ * Checks if an IP address falls within a CIDR range (supports both IPv4 and IPv6)
+ * @param {string} ip - IP address to check
+ * @param {string} cidr - CIDR notation (e.g., "192.168.0.0/16" or "2001:db8::/32")
+ * @returns {boolean} True if IP is within range, false otherwise
+ */
+const isIpInCidr = (ip, cidr) => {
+    try {
+        const [network, prefixLength] = cidr.split('/');
+        const prefix = parseInt(prefixLength, 10);
+        
+        // Detect IPv4 vs IPv6
+        const isIPv4 = network.includes('.') && !network.includes(':');
+        const isIPv6 = network.includes(':');
+        
+        if (isIPv4) {
+            // IPv4 CIDR validation
+            const networkParts = network.split('.').map(Number);
+            const ipParts = ip.split('.').map(Number);
+            
+            if (networkParts.length !== 4 || ipParts.length !== 4) return false;
+            if (prefix < 0 || prefix > 32) return false;
+            
+            const networkBits = (networkParts[0] << 24) | (networkParts[1] << 16) | (networkParts[2] << 8) | networkParts[3];
+            const ipBits = (ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3];
+            const mask = -1 << (32 - prefix);
+            
+            return (networkBits & mask) === (ipBits & mask);
+        } else if (isIPv6) {
+            // Basic IPv6 CIDR validation (simplified approach)
+            if (prefix < 0 || prefix > 128) return false;
+            
+            // Normalize IPv6 addresses
+            const normalizeIPv6 = (addr) => {
+                // Expand :: notation and pad with zeros
+                const expanded = addr.includes('::') 
+                    ? addr.replace('::', ':'.repeat(9 - addr.split(':').length))
+                    : addr;
+                return expanded.split(':').map(part => part.padStart(4, '0')).join('');
+            };
+            
+            const normalizedNetwork = normalizeIPv6(network);
+            const normalizedIp = normalizeIPv6(ip);
+            
+            if (normalizedNetwork.length !== 32 || normalizedIp.length !== 32) return false;
+            
+            // Compare hex strings up to prefix length
+            const hexBits = Math.ceil(prefix / 4);
+            const networkPrefix = normalizedNetwork.substring(0, hexBits);
+            const ipPrefix = normalizedIp.substring(0, hexBits);
+            
+            return networkPrefix === ipPrefix;
+        }
+        
+        return false;
+    } catch {
+        return false;
+    }
+};
+
+/**
  * Validates URL against security policies (allowed/blocked domains)
  * @param {string} url - URL to validate
  * @param {string[]} allowedDomains - List of allowed domains (empty = allow all)
- * @param {string[]} blockedDomains - List of blocked domains
+ * @param {string[]} blockedDomains - List of blocked domains (supports CIDR for IPs)
  * @returns {boolean} True if URL is allowed, false otherwise
  */
 const isUrlAllowed = (url, allowedDomains, blockedDomains) => {
@@ -157,23 +224,26 @@ const isUrlAllowed = (url, allowedDomains, blockedDomains) => {
         const parsedUrl = new URL(url);
         const hostname = parsedUrl.hostname.toLowerCase();
         
-        // Check blocked domains first
         for (const blockedDomain of blockedDomains) {
-            if (hostname === blockedDomain.toLowerCase() || 
-                hostname.endsWith(`.${blockedDomain.toLowerCase()}`)) {
-                return false;
+            const blocked = blockedDomain.toLowerCase();
+            
+            if (blocked.includes('/')) {
+                if (isIpInCidr(hostname, blocked)) {
+                    return false;
+                }
+            } else {
+                if (hostname === blocked || hostname.endsWith(`.${blocked}`)) {
+                    return false;
+                }
             }
         }
         
-        // If allowedDomains is empty, allow all (except blocked)
         if (allowedDomains.length === 0) {
             return true;
         }
-        
-        // Check allowed domains
         for (const allowedDomain of allowedDomains) {
-            if (hostname === allowedDomain.toLowerCase() || 
-                hostname.endsWith(`.${allowedDomain.toLowerCase()}`)) {
+            const allowed = allowedDomain.toLowerCase();
+            if (hostname === allowed || hostname.endsWith(`.${allowed}`)) {
                 return true;
             }
         }
@@ -273,6 +343,75 @@ const validateConfig = (config) => {
 };
 
 /**
+ * Template file cache for performance optimization
+ * @type {Map<string, string>}
+ */
+const TEMPLATE_CACHE = new Map();
+
+/**
+ * Reads and caches template files for performance
+ * @param {string} filePath - Path to the template file
+ * @returns {Promise<string>} File content
+ */
+const readCachedTemplate = async (filePath) => {
+    if (TEMPLATE_CACHE.has(filePath)) {
+        return TEMPLATE_CACHE.get(filePath);
+    }
+    
+    const content = await readFile(filePath, 'utf-8');
+    TEMPLATE_CACHE.set(filePath, content);
+    return content;
+};
+
+/**
+ * Translation data for supported locales (cached for performance)
+ */
+const TRANSLATIONS = Object.freeze({
+    ja: {
+        labelTitle: 'アクセシビリティレポート',
+        labelViolations: '試験結果',
+        labelFailureMessage: '発見された問題点',
+        labelFailureSummary: '修正提案',
+        labelImgAlt: 'ページのスクリーンショット',
+        labelTargetHTML: '対象 HTML',
+        labelHelpPage: '参考情報',
+        labelNoIssues: '問題点は発見されませんでした！',
+        labelImpact: '影響度',
+        impactData: Object.freeze({
+            minor: '軽度',
+            moderate: '中程度',
+            serious: '深刻',
+            critical: '重大',
+        }),
+        labelViolationFilter: '影響度フィルター',
+        labelViolationFilterNote: '（チェックを外すと該当する影響度の問題点が非表示になります）',
+        labelViolationFilterReset: 'フィルターをリセット',
+        labelViolationFilterResetAriaLabel: '影響度フィルターをリセットしてすべての問題点を表示',
+    },
+    en: {
+        labelTitle: 'Accessibility Report',
+        labelViolations: 'Test Result',
+        labelFailureMessage: 'Failure Message',
+        labelFailureSummary: 'Failure Summary',
+        labelImgAlt: 'Screenshot of the page',
+        labelTargetHTML: 'Target HTML',
+        labelHelpPage: 'More Information',
+        labelNoIssues: 'You have (0) automatic issues, nice!',
+        labelImpact: 'Impact',
+        impactData: Object.freeze({
+            minor: 'Minor',
+            moderate: 'Moderate',
+            serious: 'Serious',
+            critical: 'Critical',
+        }),
+        labelViolationFilter: 'Impact Filter',
+        labelViolationFilterNote: '(Uncheck to hide failures of the corresponding impact level)',
+        labelViolationFilterReset: 'Reset Filter',
+        labelViolationFilterResetAriaLabel: 'Reset the impact filter to display all failures.',
+    },
+});
+
+/**
  * Escapes HTML special characters to prevent XSS
  * @param {any} unsafe - Input to escape (will be converted to string)
  * @returns {string} HTML-escaped string
@@ -326,7 +465,9 @@ try {
         maxPageSize = 50 * 1024 * 1024
     } = config;
 
-    // Puppeteer launch with memory optimizations and security settings
+    /**
+     * Launch Puppeteer with memory optimizations and security settings
+     */
     const launchArgs = [
         '--disable-dev-shm-usage', // Use disk instead of shared memory
         '--disable-accelerated-2d-canvas',
@@ -334,15 +475,14 @@ try {
         '--no-zygote',
         '--disable-gpu',
         '--memory-pressure-off', // Disable memory pressure detection
-        '--max_old_space_size=2048', // Limit Node.js memory usage
         '--disable-extensions',
         '--disable-plugins',
         '--disable-images', // Disable image loading for performance and security
-        '--disable-javascript', // Will be overridden by page.setJavaScriptEnabled if needed
-        '--disable-web-security', // Only for testing, not recommended for production
+        '--disable-background-timer-throttling', // Improve performance
+        '--disable-renderer-backgrounding',
+        '--disable-backgrounding-occluded-windows',
     ];
 
-    // Add sandbox settings based on configuration
     if (!enableSandbox) {
         launchArgs.push('--no-sandbox', '--disable-setuid-sandbox');
         console.warn('\x1b[33mWarning: Browser sandbox is disabled. This reduces security.\x1b[0m');
@@ -411,10 +551,8 @@ try {
         console.log(`\x1b[32mSecurity: Page size limit set to ${Math.round(maxPageSize / 1024 / 1024)}MB\x1b[0m`);
     }
 
-    // Create output directory if it doesn't exist
     await ensureDirectoryExists(outputDirectory);
 
-    // Create a folder inside output directory based on the current datetime (`yyyy-mm-dd_hh-mm-ss`)
     const now = new Date();
     const dateTimeFolder = now.toISOString()
         .slice(0, 19)
@@ -422,8 +560,6 @@ try {
         .replace(/:/g, '-');
     const folderName = path.join(outputDirectory, dateTimeFolder);
     await ensureDirectoryExists(folderName);
-
-    // Create subdirectories for JSON and HTML files inside the dateTime folder
     const jsonFolder = path.join(folderName, 'json');
     const htmlFolder = path.join(folderName, 'html');
     await Promise.all([
@@ -451,9 +587,7 @@ try {
             console.log(`Processing ${index}/${total}: ${url}`);
 
             // Load page with security settings
-            const axeBuilder = await loadPage(browser, url.trim(), {
-                timeout: navigationTimeout
-            });
+            const axeBuilder = await loadPage(browser, url.trim());
             page = axeBuilder.page;
 
             // Set page security policies
@@ -463,14 +597,16 @@ try {
             // Enable JavaScript for accessibility testing (required for axe-core)
             await page.setJavaScriptEnabled(true);
             
-            // Set response size limit
+            // Set response size limit with cleanup
+            let responseHandler;
             if (maxPageSize > 0) {
-                page.on('response', (response) => {
+                responseHandler = (response) => {
                     const contentLength = response.headers()['content-length'];
                     if (contentLength && parseInt(contentLength, 10) > maxPageSize) {
                         throw new Error(`Page size exceeds limit: ${contentLength} bytes`);
                     }
-                });
+                };
+                page.on('response', responseHandler);
             }
 
             // Get a screenshot of the page with memory optimization
@@ -512,7 +648,7 @@ try {
             // Use streaming for large JSON to reduce memory usage
             const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
             const jsonData = JSON.stringify(results, null, jsonIndentation);
-            await writeFile(jsonFilename, jsonData, 'utf-8');
+            await writeFile(jsonFilename, jsonData, { encoding: 'utf-8', flag: 'w' });
             
             // Clear reference to help garbage collection
             results.violations?.forEach(violation => {
@@ -531,7 +667,7 @@ try {
                 throw new Error('Failed to generate valid HTML content');
             }
             
-            await writeFile(htmlFilename, htmlContent, 'utf-8');
+            await writeFile(htmlFilename, htmlContent, { encoding: 'utf-8', flag: 'w' });
 
             // Clear large variables to help garbage collection
             screenshotBase64 = null;
@@ -554,11 +690,15 @@ try {
             return { url, success: false, error: errorInfo };
         } finally {
             if (page && !page.isClosed()) {
+                // Clean up event listeners before closing page
+                if (responseHandler && maxPageSize > 0) {
+                    page.off('response', responseHandler);
+                }
                 await page.close();
             }
             
-            // Force garbage collection hint (Node.js will decide if needed)
-            if (global.gc && Math.random() < 0.1) { // 10% chance to suggest GC
+            // Periodic garbage collection (deterministic timing)
+            if (global.gc && (index % 10 === 0)) { // Every 10th URL
                 global.gc();
             }
         }
@@ -660,52 +800,14 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
     if (!isValidString(stylesPath)) {
         throw new Error('Invalid styles path provided to generateHtmlReport');
     }
-    const translations = {
-        ja: {
-            labelTitle: 'アクセシビリティレポート',
-            labelViolations: '試験結果',
-            labelFailureMessage: '発見された問題点',
-            labelFailureSummaly: '修正提案',
-            labelImgAlt: 'ページのスクリーンショット',
-            labelTargetHTML: '対象 HTML',
-            labelHelpPage: '参考情報',
-            labelNoIssues: '問題点は発見されませんでした！',
-            labelImpact: '影響度',
-            impactData: {
-                minor: '軽度',
-                moderate: '中程度',
-                serious: '深刻',
-                critical: '重大',
-            },
-            labelViolationFilter: '影響度フィルター',
-            labelViolationFilterNote: '（チェックを外すと該当する影響度の問題点が非表示になります）',
-            labelViolationFilterReset: 'フィルターをリセット',
-            labelViolationFilterResetAriaLabel: '影響度フィルターをリセットしてすべての問題点を表示',
-        },
-        en: {
-            labelTitle: 'Accessibility Report',
-            labelViolations: 'Test Result',
-            labelFailureMessage: 'Failure Message',
-            labelFailureSummaly: 'Failure Summary',
-            labelImgAlt: 'Screenshot of the page',
-            labelTargetHTML: 'Target HTML',
-            labelHelpPage: 'More Information',
-            labelNoIssues: 'You have (0) automatic issues, nice!',
-            labelImpact: 'Impact',
-            impactData: {
-                minor: 'Minor',
-                moderate: 'Moderate',
-                serious: 'Serious',
-                critical: 'Critical',
-            },
-            labelViolationFilter: 'Impact Filter',
-            labelViolationFilterNote: '(Uncheck to hide failures of the corresponding impact level)',
-            labelViolationFilterReset: 'Reset Filter',
-            labelViolationFilterResetAriaLabel: 'Reset the impact filter to display all failures.',
-        },
-        // Add translations for other languages as necessary.
-    };
-
+    const translations = TRANSLATIONS[locale] || TRANSLATIONS.en;
+    
+    /**
+     * Translates a key based on the current locale
+     * @param {string} key - Translation key
+     * @param {string} [subkey] - Sub-key for nested translations
+     * @returns {string} Translated text or 'Translation missing'
+     */
     const translate = (key, subkey) => {
         const keys = Object.hasOwn(translations, locale) ? translations[locale] : translations.ja;
         if (subkey) {
@@ -716,8 +818,8 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
         return Object.hasOwn(keys, key) ? keys[key] : 'Translation missing';
     };
 
-    const template = await readFile(templatePath, 'utf-8');
-    const cssContent = await readFile(stylesPath, 'utf-8');
+    const template = await readCachedTemplate(templatePath);
+    const cssContent = await readCachedTemplate(stylesPath);
 
     let impactListHtml;
     let violationHtml;
@@ -770,7 +872,7 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
                     <div class="helpUrl">
                         <dl>
                             <dt>${translate('labelHelpPage')}</dt>
-                            <dd><a href="${violation.helpUrl}" target="_blank" rel="noopener">${escapeHtml(violation.help)}</a></dd>
+                            <dd><a href="${escapeHtml(violation.helpUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(violation.help)}</a></dd>
                         </dl>
                     </div>
                     <div class="tagList">
@@ -812,8 +914,8 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
                                             </ul>
                                         </dd>
                                     </div>
-                                    <div class="failureSummaly">
-                                        <dt>${translate('labelFailureSummaly')}</dt>
+                                    <div class="failureSummary">
+                                        <dt>${translate('labelFailureSummary')}</dt>
                                         <dd>${escapeHtml(node.failureSummary)}</dd>
                                     </div>
                                     <div class="targetHTML">
