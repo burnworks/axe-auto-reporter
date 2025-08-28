@@ -58,10 +58,13 @@ The configuration file is config.mjs. You can set the following items:
 
 ## Caution !
 
-Attempting to run automated tests on too many URLs may not work properly and has the potential to impose excessive load on the destination server. If this happens, please reduce the number of URLs in urls.txt.
+Attempting to run automated tests on too many URLs may not work properly and has the potential to impose excessive load on the destination server. If this happens, please reduce the number of URLs in urls.txt.  
+The program is configured to allow only 1 connection per domain, with a 3-second interval between requests (both values can be changed in the configuration file).
 
 あまりに多くの URL に対して自動テストを実行しようとするとうまく行かないかもしれませんし、接続先のサーバに過剰な負荷をかけてしまう可能性があります。  
 その場合は `urls.txt` に入れる URL の数を減らすなどしてください。
+
+プログラム的には同一ドメインに対する接続数は 1、アクセス間隔は 3 秒になるようにしてあります（設定ファイルで変更可能）
 
 ## Report sample
 
