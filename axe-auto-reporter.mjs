@@ -108,15 +108,10 @@ try {
 
     // Create a folder inside 'results' based on the current datetime (`yyyy-mm-dd_hh-mm-ss`)
     const now = new Date();
-    const dateTimeFolder = new Intl.DateTimeFormat('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    }).format(now).replace(/[\/\s:]/g, '-');
+    const dateTimeFolder = now.toISOString()
+        .slice(0, 19)
+        .replace('T', '_')
+        .replace(/:/g, '-');
     const folderName = path.join(resultsFolder, dateTimeFolder);
     await ensureDirectoryExists(folderName);
 
