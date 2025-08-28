@@ -73,11 +73,7 @@ process.on('SIGTERM', async () => {
 
 // Folder existence check and creation
 const ensureDirectoryExists = async (dir) => {
-    try {
-        await mkdir(dir, { recursive: true });
-    } catch (error) {
-        if (error.code !== 'EEXIST') throw error;
-    }
+    await mkdir(dir, { recursive: true });
 };
 
 // HTML escape
