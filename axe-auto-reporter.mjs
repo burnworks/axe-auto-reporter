@@ -11,9 +11,9 @@ import { loadPage } from '@axe-core/puppeteer';
 import AXELOCALES_JA from 'axe-core/locales/ja.json' with { type: 'json' };
 import path from 'path';
 import pLimit from 'p-limit';
+import { isIP } from 'net';
 import config from './config.mjs';
 
-// Template cache promise is now managed internally by initializeTemplateCache closure
 
 /**
  * @typedef {Object} Viewport
@@ -166,12 +166,10 @@ const isIpInCidr = (ip, cidr) => {
         const [network, prefixLength] = cidr.split('/');
         const prefix = parseInt(prefixLength, 10);
         
-        // Detect IPv4 vs IPv6
         const isIPv4 = network.includes('.') && !network.includes(':');
         const isIPv6 = network.includes(':');
         
         if (isIPv4) {
-            // IPv4 CIDR validation
             const networkParts = network.split('.').map(Number);
             const ipParts = ip.split('.').map(Number);
             
@@ -184,27 +182,48 @@ const isIpInCidr = (ip, cidr) => {
             
             return (networkBits & mask) === (ipBits & mask);
         } else if (isIPv6) {
-            // Basic IPv6 CIDR validation (simplified approach)
             if (prefix < 0 || prefix > 128) return false;
             
-            // Normalize IPv6 addresses
-            const normalizeIPv6 = (addr) => {
-                // Expand :: notation and pad with zeros
-                const expanded = addr.includes('::') 
-                    ? addr.replace('::', ':'.repeat(9 - addr.split(':').length))
-                    : addr;
-                return expanded.split(':').map(part => part.padStart(4, '0')).join('');
+            // Validate IP addresses using Node.js built-in validation
+            if (isIP(network) !== 6 || isIP(ip) !== 6) return false;
+            
+            // Convert IPv6 addresses to binary representation
+            const ipv6ToBinary = (addr) => {
+                // Expand IPv6 address to full form
+                const parts = addr.split(':');
+                const expandedParts = [];
+                let doubleColonIndex = parts.indexOf('');
+                
+                if (doubleColonIndex !== -1) {
+                    // Handle :: notation
+                    const beforeDouble = parts.slice(0, doubleColonIndex);
+                    const afterDouble = parts.slice(doubleColonIndex + 1).filter(p => p !== '');
+                    const zerosNeeded = 8 - beforeDouble.length - afterDouble.length;
+                    
+                    expandedParts.push(...beforeDouble);
+                    for (let i = 0; i < zerosNeeded; i++) {
+                        expandedParts.push('0000');
+                    }
+                    expandedParts.push(...afterDouble);
+                } else {
+                    expandedParts.push(...parts);
+                }
+                
+                // Pad each part to 4 hex digits and convert to binary
+                return expandedParts
+                    .map(part => parseInt(part.padStart(4, '0'), 16))
+                    .map(num => num.toString(2).padStart(16, '0'))
+                    .join('');
             };
             
-            const normalizedNetwork = normalizeIPv6(network);
-            const normalizedIp = normalizeIPv6(ip);
+            const networkBinary = ipv6ToBinary(network);
+            const ipBinary = ipv6ToBinary(ip);
             
-            if (normalizedNetwork.length !== 32 || normalizedIp.length !== 32) return false;
+            if (networkBinary.length !== 128 || ipBinary.length !== 128) return false;
             
-            // Compare hex strings up to prefix length
-            const hexBits = Math.ceil(prefix / 4);
-            const networkPrefix = normalizedNetwork.substring(0, hexBits);
-            const ipPrefix = normalizedIp.substring(0, hexBits);
+            // Compare up to prefix length
+            const networkPrefix = networkBinary.substring(0, prefix);
+            const ipPrefix = ipBinary.substring(0, prefix);
             
             return networkPrefix === ipPrefix;
         }
@@ -370,7 +389,6 @@ const initializeTemplateCache = (() => {
                 console.log('\x1b[36mTemplate cache initialized\x1b[0m');
             } catch (error) {
                 console.warn('\x1b[33mTemplate cache initialization failed:\x1b[0m', error.message);
-                // Reset promise on failure to allow retry
                 initPromise = null;
                 throw error;
             }
@@ -443,7 +461,6 @@ const TRANSLATIONS = Object.freeze({
     },
 });
 
-// Initialize template cache on module load
 initializeTemplateCache();
 
 /**
@@ -468,7 +485,6 @@ const escapeHtml = (unsafe) => {
 
 try {
 
-    // Load and validate configure
     const config = reportConfigure();
     const configErrors = validateConfig(config);
     
@@ -529,7 +545,6 @@ try {
         args: launchArgs,
     });
 
-    // Validate file path to prevent path traversal attacks
     if (!isValidString(urlList)) {
         throw new Error('Invalid URL list file path provided');
     }
@@ -545,11 +560,9 @@ try {
         throw new Error('Relative paths with ".." or absolute paths are not allowed');
     }
 
-    // Read and validate URLs from the external file
     const urlsContent = await readFile(urlList, 'utf-8');
     const rawUrls = urlsContent.split('\n').filter(Boolean);
     
-    // Validate URLs with security checks
     const urls = [];
     const invalidUrls = [];
     const blockedUrls = [];
@@ -583,7 +596,6 @@ try {
     
     console.log(`\x1b[36mFound ${urls.length} valid URLs to process\x1b[0m`);
     
-    // Security status report
     if (enableSandbox) {
         console.log('\x1b[32mSecurity: Browser sandbox enabled\x1b[0m');
     } else {
@@ -618,17 +630,16 @@ try {
     await ensureDirectoryExists(folderName);
     const jsonFolder = path.join(folderName, 'json');
     const htmlFolder = path.join(folderName, 'html');
+    const screenshotFolder = path.join(htmlFolder, 'images');  // htmlフォルダ内にimagesディレクトリ
     await Promise.all([
         ensureDirectoryExists(jsonFolder),
-        ensureDirectoryExists(htmlFolder)
+        ensureDirectoryExists(htmlFolder),
+        ensureDirectoryExists(screenshotFolder)
     ]);
 
-    // Sanitize file name
     const sanitizeFilenamePart = (str) => str.replace(/[^a-zA-Z0-9\-_.]/g, '_');
 
-    // Process single URL with axe testing
     const processUrl = async (url, index, total) => {
-        // Validate input parameters
         if (!isValidUrl(url)) {
             return { url, success: false, error: 'Invalid URL format' };
         }
@@ -642,19 +653,14 @@ try {
         let responseHandler = null;
 
         try {
-            // 1. Initialize page with security settings
             ({ page, axeBuilder, responseHandler } = await initializePage(url, index, total, browser, navigationTimeout, maxPageSize));
             
-            // 2. Capture screenshot
-            const screenshotBase64 = await captureScreenshot(page, enableScreenshots, screenshotFormat, screenshotQuality);
+            const screenshotBuffer = await captureScreenshot(page, enableScreenshots, screenshotFormat, screenshotQuality);
             
-            // 3. Run accessibility test
             const results = await runAccessibilityTest(axeBuilder, localeData, tags);
             
-            // 4. Save results to files
-            await saveResults(url, results, screenshotBase64, locale, templatePath, stylesPath, jsonFolder, htmlFolder, jsonIndentation);
+            await saveResults(url, results, screenshotBuffer, screenshotFormat, locale, templatePath, stylesPath, jsonFolder, htmlFolder, screenshotFolder, jsonIndentation);
             
-            // 5. Clean up memory
             await cleanupMemory(results, index);
             
             console.log(`\x1b[32mCompleted!\x1b[0m ${index}/${total}: ${url}`);
@@ -667,7 +673,6 @@ try {
         }
     };
 
-    // Helper functions for processUrl
     const initializePage = async (url, index, total, browser, navigationTimeout, maxPageSize) => {
         console.log(`Processing ${index}/${total}: ${url}`);
 
@@ -693,11 +698,12 @@ try {
     };
 
     const captureScreenshot = async (page, enableScreenshots, screenshotFormat, screenshotQuality) => {
-        if (!enableScreenshots) return '';
+        if (!enableScreenshots) return null;
 
         const screenshotOptions = { 
-            encoding: 'base64',
+            encoding: 'binary',
             type: screenshotFormat,
+            fullPage: true,
             ...(screenshotFormat !== 'png' && { quality: screenshotQuality })
         };
         return await page.screenshot(screenshotOptions);
@@ -713,7 +719,7 @@ try {
         return results;
     };
 
-    const saveResults = async (url, results, screenshotBase64, locale, templatePath, stylesPath, jsonFolder, htmlFolder, jsonIndentation) => {
+    const saveResults = async (url, results, screenshotBuffer, screenshotFormat, locale, templatePath, stylesPath, jsonFolder, htmlFolder, screenshotFolder, jsonIndentation) => {
         const parsedURL = new URL(url);
         const domain = parsedURL.hostname;
         
@@ -729,14 +735,20 @@ try {
             throw new Error('Failed to generate valid filename');
         }
 
-        // Save JSON file
+        let screenshotRelativePath = null;
+        if (screenshotBuffer) {
+            const screenshotExtension = screenshotFormat === 'png' ? 'png' : (screenshotFormat === 'webp' ? 'webp' : 'jpg');
+            const screenshotFilename = path.join(screenshotFolder, `${baseFilename}.${screenshotExtension}`);
+            await writeFile(screenshotFilename, screenshotBuffer);
+            screenshotRelativePath = `./images/${baseFilename}.${screenshotExtension}`;
+        }
+
         const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
         const jsonData = JSON.stringify(results, null, jsonIndentation);
         await writeFile(jsonFilename, jsonData, { encoding: 'utf-8', flag: 'w' });
         
-        // Save HTML file
         const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
-        const htmlContent = await generateHtmlReport(url, results, screenshotBase64, locale, templatePath, stylesPath);
+        const htmlContent = await generateHtmlReport(url, results, screenshotRelativePath, locale, templatePath, stylesPath);
         
         if (!isValidString(htmlContent)) {
             throw new Error('Failed to generate valid HTML content');
@@ -746,23 +758,19 @@ try {
     };
 
     const cleanupMemory = async (results, index) => {
-        // Efficient memory cleanup without manual property deletion
         if (results.violations) {
             results.violations.forEach(violation => {
                 if (violation.nodes) {
-                    // Create new array without element references instead of deleting
                     violation.nodes = violation.nodes.map(({ element, ...node }) => node);
                 }
             });
         }
 
-        // Use WeakRef-based cleanup instead of manual GC (Node.js v22+ compatible)
         if (typeof globalThis.gc === 'function' && (index % 50 === 0)) {
-            // Only trigger GC every 50 URLs to avoid performance impact
             try {
                 globalThis.gc();
             } catch (error) {
-                // Silently ignore GC errors in production
+                // Ignore errors
             }
         }
     };
@@ -850,14 +858,14 @@ try {
  * @async
  * @param {string} url - URL that was tested
  * @param {AxeResults} results - Axe test results object
- * @param {string} screenshotBase64 - Base64 encoded screenshot
+ * @param {string|null} screenshotRelativePath - Relative path to screenshot file or null
  * @param {string} locale - Locale for the report
  * @param {string} templatePath - Path to HTML template file
  * @param {string} stylesPath - Path to CSS styles file
  * @returns {Promise<string>} Generated HTML content
  * @throws {Error} When invalid parameters are provided
  */
-async function generateHtmlReport(url, results, screenshotBase64, locale, templatePath, stylesPath) {
+async function generateHtmlReport(url, results, screenshotRelativePath, locale, templatePath, stylesPath) {
     // Validate input parameters
     if (!isValidUrl(url)) {
         throw new Error('Invalid URL provided to generateHtmlReport');
@@ -867,17 +875,13 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
         throw new Error('Invalid results object provided to generateHtmlReport');
     }
     
-    // Enhanced screenshot validation to prevent XSS
-    if (typeof screenshotBase64 !== 'string') {
-        throw new Error('Invalid screenshot data provided to generateHtmlReport');
+    // Validate screenshot path to prevent XSS and path traversal
+    if (screenshotRelativePath !== null && typeof screenshotRelativePath !== 'string') {
+        throw new Error('Invalid screenshot path provided to generateHtmlReport');
     }
     
-    if (screenshotBase64 && !/^[A-Za-z0-9+/=]*$/.test(screenshotBase64)) {
-        throw new Error('Screenshot data contains invalid base64 characters');
-    }
-    
-    if (screenshotBase64 && screenshotBase64.length > 10 * 1024 * 1024) { // 10MB limit
-        throw new Error('Screenshot data exceeds size limit');
+    if (screenshotRelativePath && (screenshotRelativePath.includes('..') || screenshotRelativePath.startsWith('/'))) {
+        throw new Error('Screenshot path contains invalid characters or path traversal attempts');
     }
     
     if (!isValidString(locale)) {
@@ -1025,22 +1029,10 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
         `).join('');
     }
 
-    // Safe screenshot content generation with proper validation
-    const screenshotContent = screenshotBase64 ? (() => {
-        // Safe image format detection based on base64 magic bytes
-        let imageFormat = 'png'; // Default to PNG
-        if (screenshotBase64.startsWith('/9j/')) {
-            imageFormat = 'jpeg';
-        } else if (screenshotBase64.startsWith('UklGR')) {
-            imageFormat = 'webp';
-        }
-        
-        // Additional escaping for extra security
-        const safeBase64 = screenshotBase64.replace(/['"<>]/g, '');
-        const safeAltText = escapeHtml(translate('labelImgAlt'));
-        
-        return `<img src="data:image/${imageFormat};base64,${safeBase64}" alt="${safeAltText}">`;
-    })() : '<div class="no-screenshot">Screenshot disabled for memory optimization</div>';
+    // Generate screenshot content with external file reference for better performance
+    const screenshotContent = screenshotRelativePath 
+        ? `<img src="${escapeHtml(screenshotRelativePath)}" alt="${escapeHtml(translate('labelImgAlt'))}" loading="lazy">`
+        : '<div class="no-screenshot">Screenshot disabled for memory optimization</div>';
 
     return template
         .replace('{{STYLE}}', `<style>${cssContent}</style>`)
