@@ -53,88 +53,31 @@
  * @type {ReporterConfiguration}
  */
 export default {
-    /** Path to the file containing URLs to test */
     urlList: 'urls.txt',
-    
-    /** Locale setting for reports and axe-core ('ja' | 'en') */
     locale: 'ja',
-    
-    /** 
-     * Axe-core Tags setting for accessibility testing
-     * @see https://github.com/dequelabs/axe-core/blob/master/doc/API.md#axe-core-tags
-     */
     tags: [
         'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice',
     ],
-    
-    /** Viewport mode for browser emulation ('pc' | 'mobile') */
     mode: 'pc',
-    
-    /** 
-     * Concurrent processing settings 
-     */
-    /** Number of URLs to process concurrently (1-10) */
     concurrency: 3,
-    
-    /** Enable/disable concurrent processing */
     enableConcurrency: true,
-    
-    /** Maximum concurrent requests per domain (1-3) */
     maxConcurrentPerDomain: 1,
-    
-    /** Delay between requests to same domain in milliseconds (1000-3000ms recommended) */
     delayBetweenRequests: 3000,
-    
-    /** 
-     * Memory optimization settings 
-     */
-    /** Screenshot format - 'jpeg' uses less memory than 'png' */
     screenshotFormat: 'jpeg',
-    
-    /** Quality for JPEG/WebP screenshots (0-100, ignored for PNG) */
     screenshotQuality: 80,
-    
-    /** Enable/disable screenshot capture to save memory */
     enableScreenshots: true,
-    
-    /** 
-     * File and directory paths 
-     */
-    /** Directory for storing results */
     outputDirectory: 'results',
-    
-    /** Path to HTML template file */
     templatePath: 'template/template.html',
-    
-    /** Path to CSS styles file */
     stylesPath: 'template/styles.css',
-    
-    /** 
-     * Output formatting 
-     */
-    /** Number of spaces for JSON pretty printing */
     jsonIndentation: 2,
-    
-    /** 
-     * Security settings 
-     */
-    /** Navigation timeout in milliseconds */
     navigationTimeout: 30000,
-    
-    /** Allowed domains for URL testing (empty array allows all) */
     allowedDomains: [],
-    
-    /** Blocked domains for URL testing */
     blockedDomains: [
         'localhost', '127.0.0.1', '0.0.0.0', '::1',
-        '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', // Private IP ranges
-        'metadata.google.internal', 'instance-data', // Cloud metadata endpoints
+        '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16',
+        'metadata.google.internal', 'instance-data',
         'link-local', 'automatic'
     ],
-    
-    /** Enable browser sandbox for security */
     enableSandbox: true,
-    
-    /** Maximum page size in bytes (0 = unlimited) */
-    maxPageSize: 50 * 1024 * 1024, // 50MB
+    maxPageSize: 50 * 1024 * 1024
 };
