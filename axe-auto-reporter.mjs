@@ -809,13 +809,12 @@ async function generateHtmlReport(url, results, screenshotBase64, locale, templa
      * @returns {string} Translated text or 'Translation missing'
      */
     const translate = (key, subkey) => {
-        const keys = Object.hasOwn(translations, locale) ? translations[locale] : translations.ja;
         if (subkey) {
-            return (Object.hasOwn(keys, key) && keys[key] && Object.hasOwn(keys[key], subkey)) 
-                ? keys[key][subkey] 
+            return (Object.hasOwn(translations, key) && translations[key] && Object.hasOwn(translations[key], subkey)) 
+                ? translations[key][subkey] 
                 : 'Translation missing';
         }
-        return Object.hasOwn(keys, key) ? keys[key] : 'Translation missing';
+        return Object.hasOwn(translations, key) ? translations[key] : 'Translation missing';
     };
 
     const template = await readCachedTemplate(templatePath);
