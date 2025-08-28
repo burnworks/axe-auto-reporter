@@ -248,8 +248,13 @@ async function generateHtmlReport(url, results, screenshotBase64, locale) {
     };
 
     const translate = (key, subkey) => {
-        const keys = translations[locale] || translations.ja;
-        return subkey ? keys[key][subkey] || keys[key] : keys[key] || 'Translation missing';
+        const keys = Object.hasOwn(translations, locale) ? translations[locale] : translations.ja;
+        if (subkey) {
+            return (Object.hasOwn(keys, key) && Object.hasOwn(keys[key], subkey)) 
+                ? keys[key][subkey] 
+                : (Object.hasOwn(keys, key) ? keys[key] : 'Translation missing');
+        }
+        return Object.hasOwn(keys, key) ? keys[key] : 'Translation missing';
     };
 
     const template = await readFile('template/template.html', 'utf-8');
@@ -327,7 +332,7 @@ async function generateHtmlReport(url, results, screenshotBase64, locale) {
                                         </dt>
                                         <dd class="failureList">
                                             <ul>
-                                                ${node.any && node.any.length ? node.any.map(anyMessage => `
+                                                ${Object.hasOwn(node, 'any') && node.any.length ? node.any.map(anyMessage => `
                                                     <li>
                                                         <span class="failureListIcon" aria-hidden="true">
                                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -336,7 +341,7 @@ async function generateHtmlReport(url, results, screenshotBase64, locale) {
                                                         </span>
                                                     ${escapeHtml(anyMessage.message)}</li>
                                                 `).join('') : ''}
-                                                ${node.none && node.none.length ? node.none.map(noneMessage => `
+                                                ${Object.hasOwn(node, 'none') && node.none.length ? node.none.map(noneMessage => `
                                                 <li>
                                                     <span class="failureListIcon" aria-hidden="true">
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
