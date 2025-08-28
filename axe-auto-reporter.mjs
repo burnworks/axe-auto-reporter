@@ -28,10 +28,47 @@ const reportConfigure = () => {
     return newConfig;
 };
 
-// Error Handling
-process.on('unhandledRejection', (error) => {
-    console.error('\x1b[31mUnhandled promise rejection:\x1b[0m', error);
+// Global Error Handling
+let browser;
+
+const cleanup = async () => {
+    if (browser) {
+        try {
+            await browser.close();
+        } catch (error) {
+            console.error('\x1b[31mError during browser cleanup:\x1b[0m', error.message);
+        }
+    }
+};
+
+process.on('unhandledRejection', async (reason, promise) => {
+    console.error('\x1b[31mUnhandled promise rejection:\x1b[0m');
+    console.error('Reason:', reason);
+    console.error('Promise:', promise);
+    
+    await cleanup();
     process.exit(1);
+});
+
+process.on('uncaughtException', async (error) => {
+    console.error('\x1b[31mUncaught exception:\x1b[0m');
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
+    
+    await cleanup();
+    process.exit(1);
+});
+
+process.on('SIGINT', async () => {
+    console.log('\n\x1b[33mReceived SIGINT. Cleaning up...\x1b[0m');
+    await cleanup();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('\n\x1b[33mReceived SIGTERM. Cleaning up...\x1b[0m');
+    await cleanup();
+    process.exit(0);
 });
 
 // Folder existence check and creation
@@ -60,7 +97,7 @@ try {
     const { urlList, localeData, tags, locale, viewport } = reportConfigure();
 
     // Puppeteer launch
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
         headless: 'new',
         defaultViewport: viewport,
     });
@@ -139,12 +176,18 @@ try {
             processedCount++;
             console.log(`\x1b[32mCompleted!\x1b[0m ${processedCount}/${urls.length}: ${url}`);
         } catch (error) {
-            console.error(`\x1b[31mFailed to process URL:\x1b[0m ${url}`, {
+            const errorInfo = {
+                url,
                 message: error.message,
                 stack: error.stack,
-                url,
-                timestamp: new Date().toISOString()
-            });
+                timestamp: new Date().toISOString(),
+                type: error.constructor.name
+            };
+            
+            console.error(`\x1b[31mFailed to process URL:\x1b[0m ${url}`);
+            console.error('Error details:', errorInfo);
+            
+            // Continue processing other URLs instead of stopping
             processedCount++;
         } finally {
             if (page && !page.isClosed()) {
@@ -153,9 +196,15 @@ try {
         }
     }
 
-    await browser.close();
+    await cleanup();
+    console.log('\x1b[32mAll URLs processed successfully!\x1b[0m');
 } catch (error) {
-    console.error('Fatal error:', error);
+    console.error('\x1b[31mFatal error occurred:\x1b[0m');
+    console.error('Error type:', error.constructor.name);
+    console.error('Message:', error.message);
+    console.error('Stack trace:', error.stack);
+    
+    await cleanup();
     process.exit(1);
 }
 
