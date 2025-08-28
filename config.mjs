@@ -68,14 +68,18 @@ export default {
     /** Viewport mode for browser emulation ('pc' | 'mobile') */
     mode: 'pc',
     
-    // Concurrent processing settings
+    /** 
+     * Concurrent processing settings 
+     */
     /** Number of URLs to process concurrently (1-10) */
     concurrency: 3,
     
     /** Enable/disable concurrent processing */
     enableConcurrency: true,
     
-    // Memory optimization settings
+    /** 
+     * Memory optimization settings 
+     */
     /** Screenshot format - 'jpeg' uses less memory than 'png' */
     screenshotFormat: 'jpeg',
     
@@ -85,7 +89,9 @@ export default {
     /** Enable/disable screenshot capture to save memory */
     enableScreenshots: true,
     
-    // File and directory paths
+    /** 
+     * File and directory paths 
+     */
     /** Directory for storing results */
     outputDirectory: 'results',
     
@@ -95,11 +101,15 @@ export default {
     /** Path to CSS styles file */
     stylesPath: 'template/styles.css',
     
-    // Output formatting
+    /** 
+     * Output formatting 
+     */
     /** Number of spaces for JSON pretty printing */
     jsonIndentation: 2,
     
-    // Security settings
+    /** 
+     * Security settings 
+     */
     /** Navigation timeout in milliseconds */
     navigationTimeout: 30000,
     
@@ -107,7 +117,12 @@ export default {
     allowedDomains: [],
     
     /** Blocked domains for URL testing */
-    blockedDomains: ['localhost', '127.0.0.1', '0.0.0.0', '::1'],
+    blockedDomains: [
+        'localhost', '127.0.0.1', '0.0.0.0', '::1',
+        '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', // Private IP ranges
+        'metadata.google.internal', 'instance-data', // Cloud metadata endpoints
+        'link-local', 'automatic'
+    ],
     
     /** Enable browser sandbox for security */
     enableSandbox: true,
