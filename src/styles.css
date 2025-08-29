@@ -225,13 +225,13 @@
         @apply text-red-900;
     }
 
-    .failureSummaly,
+    .failureSummary,
     .targetHTML,
     .targetDom {
         @apply pl-8;
     }
 
-    .failureSummaly dt,
+    .failureSummary dt,
     .targetHTML dt,
     .targetDom dt {
         @apply font-bold;
