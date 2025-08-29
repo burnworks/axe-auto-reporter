@@ -1,4 +1,5 @@
 @import "tailwindcss";
+
 @layer components {
     header {
         @apply p-6 border-b border-gray-200 bg-gray-50;
@@ -258,6 +259,10 @@
     .summary-table {
         @apply px-6 py-12;
 
+        .results-section-header {
+            @apply font-bold text-lg mb-4;
+        }
+
         .overflow-table {
             @apply overflow-x-auto scroll-smooth;
         }
@@ -300,6 +305,112 @@
         .violation-count-summary {
             @apply flex items-center gap-4;
         }
+
+        .sort-icon {
+                @apply inline-block ml-2 text-gray-600 hover:cursor-pointer;
+
+            svg {
+                @apply size-4;
+            }
+        }
+        
+        .impact-cell,
+        .total-cell {
+            @apply text-center font-bold;
+        }
+        
+        .impact-cell.minor {
+            @apply text-sky-800;
+        }
+        .impact-cell.moderate {
+            @apply text-purple-800;
+        }
+        .impact-cell.serious {
+            @apply text-red-700;
+        }
+        .impact-cell.critical {
+            @apply text-red-900;
+        }
+        .total-cell {
+            @apply text-gray-700;
+        }
+
+    }
+
+    .stats-summary {
+        @apply px-6 py-12;
+
+        .stats-summary-header {
+            @apply font-bold text-lg mb-2;
+
+            span {
+                @apply font-normal text-sm inline-block ml-2;
+            }
+        }
+        
+        .stats-cards {
+            @apply grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-5;
+        }
+            
+        .stat-card {
+            @apply text-center rounded-md bg-gray-50 p-4; 
+        }
+        
+        .stat-card h3 {
+            @apply font-bold text-lg;
+        }
+        
+        .stat-number {
+            @apply font-bold text-5xl my-4;
+
+            span {
+                @apply inline-block ml-2 text-xl;
+            }
+        }
+        
+        .stat-card.critical {
+            @apply border border-red-900;
+
+            .stat-number {
+                @apply text-red-900;
+            }
+        }
+        
+        .stat-card.serious {
+            @apply border border-red-700;
+
+            .stat-number {
+                @apply text-red-700;
+            }
+        }
+        
+        .stat-card.moderate {
+            @apply border border-purple-800;
+            .stat-number {
+                @apply text-purple-800;
+            }
+        }
+        
+        .stat-card.minor {
+            @apply border border-sky-800;
+
+            .stat-number {
+                @apply text-sky-800;
+            }
+        }
+        
+        .stat-card.any {
+            @apply border border-gray-700;
+
+            .stat-number {
+                @apply text-gray-700;
+            }
+        }
+        
+        .stat-label {
+            @apply text-base;
+        }
+            
     }
 
 }

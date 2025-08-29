@@ -1,6 +1,6 @@
 /**
  * @fileoverview Automated accessibility testing script using axe-core and Puppeteer
- * @version 2.0.2
+ * @version 3.1.0
  * @author burnworks
  * @requires node >=22.0.0
  */
@@ -13,6 +13,7 @@ import path from 'path';
 import pLimit from 'p-limit';
 import { isIP } from 'net';
 import config from './config.mjs';
+import { generateBaseFilename } from './utils/filename.mjs';
 
 
 /**
@@ -60,11 +61,11 @@ const VIEWPORTS = {
  */
 const reportConfigure = () => {
     const newConfig = { ...config };
-    
+
     if (newConfig.locale === 'ja') {
         newConfig.localeData = AXELOCALES_JA;
     }
-    
+
     if (newConfig.mode === 'pc') {
         newConfig.viewport = VIEWPORTS.PC;
     } else if (newConfig.mode === 'mobile') {
@@ -73,7 +74,7 @@ const reportConfigure = () => {
         console.error('\x1b[31mInvalid mode specified\x1b[0m');
         throw new Error('Invalid mode specified');
     }
-    
+
     return newConfig;
 };
 
@@ -102,7 +103,7 @@ process.on('unhandledRejection', async (reason, promise) => {
     console.error('\x1b[31mUnhandled promise rejection:\x1b[0m');
     console.error('Reason:', reason);
     console.error('Promise:', promise);
-    
+
     await cleanup();
     process.exit(1);
 });
@@ -111,7 +112,7 @@ process.on('uncaughtException', async (error) => {
     console.error('\x1b[31mUncaught exception:\x1b[0m');
     console.error('Error:', error.message);
     console.error('Stack:', error.stack);
-    
+
     await cleanup();
     process.exit(1);
 });
@@ -163,30 +164,30 @@ const isIpInCidr = (ip, cidr) => {
     try {
         const [network, prefixLength] = cidr.split('/');
         const prefix = parseInt(prefixLength, 10);
-        
+
         const isIPv4 = network.includes('.') && !network.includes(':');
         const isIPv6 = network.includes(':');
-        
+
         if (isIPv4) {
             const networkParts = network.split('.').map(Number);
             const ipParts = ip.split('.').map(Number);
-            
+
             if (networkParts.length !== 4 || ipParts.length !== 4) return false;
             if (prefix < 0 || prefix > 32) return false;
-            
+
             const networkBits = (networkParts[0] << 24) | (networkParts[1] << 16) | (networkParts[2] << 8) | networkParts[3];
             const ipBits = (ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3];
             const mask = -1 << (32 - prefix);
-            
+
             return (networkBits & mask) === (ipBits & mask);
         } else if (isIPv6) {
             if (prefix < 0 || prefix > 128) return false;
-            
+
             /**
              * Validate IP addresses using Node.js built-in validation
              */
             if (isIP(network) !== 6 || isIP(ip) !== 6) return false;
-            
+
             /**
              * Convert IPv6 addresses to binary representation
              * @param {string} addr - IPv6 address to convert
@@ -199,12 +200,12 @@ const isIpInCidr = (ip, cidr) => {
                 const parts = addr.split(':');
                 const expandedParts = [];
                 let doubleColonIndex = parts.indexOf('');
-                
+
                 if (doubleColonIndex !== -1) {
                     const beforeDouble = parts.slice(0, doubleColonIndex);
                     const afterDouble = parts.slice(doubleColonIndex + 1).filter(p => p !== '');
                     const zerosNeeded = 8 - beforeDouble.length - afterDouble.length;
-                    
+
                     expandedParts.push(...beforeDouble);
                     for (let i = 0; i < zerosNeeded; i++) {
                         expandedParts.push('0000');
@@ -213,7 +214,7 @@ const isIpInCidr = (ip, cidr) => {
                 } else {
                     expandedParts.push(...parts);
                 }
-                
+
                 /**
                  * Pad each part to 4 hex digits and convert to binary
                  */
@@ -222,21 +223,21 @@ const isIpInCidr = (ip, cidr) => {
                     .map(num => num.toString(2).padStart(16, '0'))
                     .join('');
             };
-            
+
             const networkBinary = ipv6ToBinary(network);
             const ipBinary = ipv6ToBinary(ip);
-            
+
             if (networkBinary.length !== 128 || ipBinary.length !== 128) return false;
-            
+
             /**
              * Compare up to prefix length
              */
             const networkPrefix = networkBinary.substring(0, prefix);
             const ipPrefix = ipBinary.substring(0, prefix);
-            
+
             return networkPrefix === ipPrefix;
         }
-        
+
         return false;
     } catch {
         return false;
@@ -254,10 +255,10 @@ const isUrlAllowed = (url, allowedDomains, blockedDomains) => {
     try {
         const parsedUrl = new URL(url);
         const hostname = parsedUrl.hostname.toLowerCase();
-        
+
         for (const blockedDomain of blockedDomains) {
             const blocked = blockedDomain.toLowerCase();
-            
+
             if (blocked.includes('/')) {
                 if (isIpInCidr(hostname, blocked)) {
                     return false;
@@ -268,7 +269,7 @@ const isUrlAllowed = (url, allowedDomains, blockedDomains) => {
                 }
             }
         }
-        
+
         if (allowedDomains.length === 0) {
             return true;
         }
@@ -278,7 +279,7 @@ const isUrlAllowed = (url, allowedDomains, blockedDomains) => {
                 return true;
             }
         }
-        
+
         return false;
     } catch {
         return false;
@@ -299,7 +300,7 @@ const isValidString = (str) => typeof str === 'string' && str.trim().length > 0;
  * @param {number} [max=Infinity] - Maximum allowed value
  * @returns {boolean} True if valid number in range, false otherwise
  */
-const isValidNumber = (num, min = 0, max = Infinity) => 
+const isValidNumber = (num, min = 0, max = Infinity) =>
     typeof num === 'number' && !isNaN(num) && num >= min && num <= max;
 
 /**
@@ -309,67 +310,67 @@ const isValidNumber = (num, min = 0, max = Infinity) =>
  */
 const validateConfig = (config) => {
     const errors = [];
-    
+
     if (!isValidString(config.urlList)) {
         errors.push('urlList must be a non-empty string');
     }
-    
+
     if (!isValidString(config.locale)) {
         errors.push('locale must be a non-empty string');
     }
-    
+
     if (!Array.isArray(config.tags) || config.tags.length === 0) {
         errors.push('tags must be a non-empty array');
     }
-    
+
     if (!isValidString(config.mode)) {
         errors.push('mode must be a non-empty string');
     }
-    
+
     if (Object.hasOwn(config, 'concurrency') && !isValidNumber(config.concurrency, 1, 10)) {
         errors.push('concurrency must be a number between 1 and 10');
     }
-    
+
     if (Object.hasOwn(config, 'enableConcurrency') && typeof config.enableConcurrency !== 'boolean') {
         errors.push('enableConcurrency must be a boolean');
     }
-    
+
     if (Object.hasOwn(config, 'outputDirectory') && !isValidString(config.outputDirectory)) {
         errors.push('outputDirectory must be a non-empty string');
     }
-    
+
     if (Object.hasOwn(config, 'templatePath') && !isValidString(config.templatePath)) {
         errors.push('templatePath must be a non-empty string');
     }
-    
+
     if (Object.hasOwn(config, 'stylesPath') && !isValidString(config.stylesPath)) {
         errors.push('stylesPath must be a non-empty string');
     }
-    
+
     if (Object.hasOwn(config, 'jsonIndentation') && !isValidNumber(config.jsonIndentation, 0, 10)) {
         errors.push('jsonIndentation must be a number between 0 and 10');
     }
-    
+
     if (Object.hasOwn(config, 'navigationTimeout') && !isValidNumber(config.navigationTimeout, 1000, 300000)) {
         errors.push('navigationTimeout must be a number between 1000 and 300000 milliseconds');
     }
-    
+
     if (Object.hasOwn(config, 'allowedDomains') && !Array.isArray(config.allowedDomains)) {
         errors.push('allowedDomains must be an array');
     }
-    
+
     if (Object.hasOwn(config, 'blockedDomains') && !Array.isArray(config.blockedDomains)) {
         errors.push('blockedDomains must be an array');
     }
-    
+
     if (Object.hasOwn(config, 'enableSandbox') && typeof config.enableSandbox !== 'boolean') {
         errors.push('enableSandbox must be a boolean');
     }
-    
+
     if (Object.hasOwn(config, 'maxPageSize') && !isValidNumber(config.maxPageSize, 0, 1024 * 1024 * 1024)) {
         errors.push('maxPageSize must be a number between 0 and 1GB');
     }
-    
+
     return errors;
 };
 
@@ -385,10 +386,10 @@ const TEMPLATE_CACHE = new Map();
  */
 const initializeTemplateCache = (() => {
     let initPromise = null;
-    
+
     return async () => {
         if (initPromise) return initPromise;
-        
+
         initPromise = (async () => {
             try {
                 await Promise.all([
@@ -402,7 +403,7 @@ const initializeTemplateCache = (() => {
                 throw error;
             }
         })();
-        
+
         return initPromise;
     };
 })();
@@ -416,7 +417,7 @@ const readCachedTemplate = async (filePath) => {
     if (TEMPLATE_CACHE.has(filePath)) {
         return TEMPLATE_CACHE.get(filePath);
     }
-    
+
     const content = await readFile(filePath, 'utf-8');
     TEMPLATE_CACHE.set(filePath, content);
     return content;
@@ -482,7 +483,7 @@ const escapeHtml = (unsafe) => {
         console.warn('escapeHtml received non-string input:', typeof unsafe);
         return String(unsafe);
     }
-    
+
     return unsafe
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -496,21 +497,21 @@ try {
 
     const config = reportConfigure();
     const configErrors = validateConfig(config);
-    
+
     if (configErrors.length > 0) {
         console.error('\x1b[31mConfiguration validation errors:\x1b[0m');
         configErrors.forEach(error => console.error(`  - ${error}`));
         throw new Error('Invalid configuration');
     }
-    
-    const { 
-        urlList, 
-        localeData, 
-        tags, 
-        locale, 
-        viewport, 
-        concurrency, 
-        enableConcurrency, 
+
+    const {
+        urlList,
+        localeData,
+        tags,
+        locale,
+        viewport,
+        concurrency,
+        enableConcurrency,
         screenshotFormat = 'jpeg',
         screenshotQuality = 80,
         enableScreenshots = true,
@@ -558,29 +559,21 @@ try {
     if (!isValidString(urlList)) {
         throw new Error('Invalid URL list file path provided');
     }
-    
+
     const normalizedPath = path.resolve(urlList);
     const currentDir = path.resolve('.');
-    
+
     if (!normalizedPath.startsWith(currentDir)) {
         throw new Error('URL list file path must be within current directory');
-    }
-    
-    /**
-     * Check for path traversal attempts after normalization
-     */
-    const relativePath = path.relative(currentDir, normalizedPath);
-    if (relativePath.includes('..') || path.isAbsolute(relativePath) || relativePath.startsWith('/')) {
-        throw new Error('Path contains invalid characters or attempts path traversal');
     }
 
     const urlsContent = await readFile(urlList, 'utf-8');
     const rawUrls = urlsContent.split('\n').filter(Boolean);
-    
+
     const urls = [];
     const invalidUrls = [];
     const blockedUrls = [];
-    
+
     for (const rawUrl of rawUrls) {
         const trimmedUrl = rawUrl.trim();
         if (isValidUrl(trimmedUrl)) {
@@ -593,37 +586,37 @@ try {
             invalidUrls.push(trimmedUrl);
         }
     }
-    
+
     if (invalidUrls.length > 0) {
         console.warn('\x1b[33mInvalid URLs found and will be skipped:\x1b[0m');
         invalidUrls.forEach(url => console.warn(`  - ${url}`));
     }
-    
+
     if (blockedUrls.length > 0) {
         console.warn('\x1b[33mBlocked URLs found and will be skipped (security policy):\x1b[0m');
         blockedUrls.forEach(url => console.warn(`  - ${url}`));
     }
-    
+
     if (urls.length === 0) {
         throw new Error('No valid URLs found in the URL list file');
     }
-    
+
     console.log(`\x1b[36mFound ${urls.length} valid URLs to process\x1b[0m`);
-    
+
     if (enableSandbox) {
         console.log('\x1b[32mSecurity: Browser sandbox enabled\x1b[0m');
     } else {
         console.warn('\x1b[33mSecurity: Browser sandbox disabled\x1b[0m');
     }
-    
+
     if (allowedDomains.length > 0) {
         console.log(`\x1b[32mSecurity: Domain allowlist active (${allowedDomains.length} domains)\x1b[0m`);
     }
-    
+
     if (blockedDomains.length > 0) {
         console.log(`\x1b[32mSecurity: Domain blocklist active (${blockedDomains.length} domains)\x1b[0m`);
     }
-    
+
     if (maxPageSize > 0) {
         console.log(`\x1b[32mSecurity: Page size limit set to ${Math.round(maxPageSize / 1024 / 1024)}MB\x1b[0m`);
     }
@@ -651,13 +644,12 @@ try {
         ensureDirectoryExists(screenshotFolder)
     ]);
 
-    const sanitizeFilenamePart = (str) => str.replace(/[^a-zA-Z0-9\-_.]/g, '_');
 
     const processUrl = async (url, index, total) => {
         if (!isValidUrl(url)) {
             return { url, success: false, error: 'Invalid URL format' };
         }
-        
+
         if (!isValidNumber(index, 1) || !isValidNumber(total, 1)) {
             return { url, success: false, error: 'Invalid index or total parameters' };
         }
@@ -668,15 +660,15 @@ try {
 
         try {
             ({ page, axeBuilder, eventHandlers } = await initializePage(url, index, total, browser, navigationTimeout, maxPageSize));
-            
+
             const screenshotBuffer = await captureScreenshot(page, enableScreenshots, screenshotFormat, screenshotQuality);
-            
+
             const results = await runAccessibilityTest(axeBuilder, localeData, tags);
-            
+
             await saveResults(url, results, screenshotBuffer, screenshotFormat, locale, templatePath, stylesPath, jsonFolder, htmlFolder, screenshotFolder, jsonIndentation);
-            
+
             await cleanupMemory(results, index);
-            
+
             console.log(`\x1b[32mCompleted!\x1b[0m ${index}/${total}: ${url}`);
             return { url, success: true };
 
@@ -715,7 +707,7 @@ try {
     const captureScreenshot = async (page, enableScreenshots, screenshotFormat, screenshotQuality) => {
         if (!enableScreenshots) return null;
 
-        const screenshotOptions = { 
+        const screenshotOptions = {
             encoding: 'binary',
             type: screenshotFormat,
             fullPage: false,
@@ -735,17 +727,8 @@ try {
     };
 
     const saveResults = async (url, results, screenshotBuffer, screenshotFormat, locale, templatePath, stylesPath, jsonFolder, htmlFolder, screenshotFolder, jsonIndentation) => {
-        const parsedURL = new URL(url);
-        const domain = parsedURL.hostname;
-        
-        if (!isValidString(domain)) {
-            throw new Error('Invalid domain extracted from URL');
-        }
-        
-        const pathName = sanitizeFilenamePart(parsedURL.pathname.slice(1).replace(/\/$/g, ''));
-        const queryString = sanitizeFilenamePart(parsedURL.search.slice(1));
-        const baseFilename = `${domain}${pathName ? `_${pathName}` : ''}${queryString ? `_${queryString}` : ''}`;
-        
+        const baseFilename = generateBaseFilename(url);
+
         if (!isValidString(baseFilename)) {
             throw new Error('Failed to generate valid filename');
         }
@@ -761,14 +744,14 @@ try {
         const jsonFilename = path.join(jsonFolder, `${baseFilename}.json`);
         const jsonData = JSON.stringify(results, null, jsonIndentation);
         await writeFile(jsonFilename, jsonData, { encoding: 'utf-8', flag: 'w' });
-        
+
         const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
         const htmlContent = await generateHtmlReport(url, results, screenshotRelativePath, locale, templatePath, stylesPath);
-        
+
         if (!isValidString(htmlContent)) {
             throw new Error('Failed to generate valid HTML content');
         }
-        
+
         await writeFile(htmlFilename, htmlContent, { encoding: 'utf-8', flag: 'w' });
     };
 
@@ -797,10 +780,10 @@ try {
             timestamp: new Date().toISOString(),
             type: error.constructor.name
         };
-        
+
         console.error(`\x1b[31mFailed to process URL:\x1b[0m ${url}`);
         console.error('Error details:', errorInfo);
-        
+
         return { url, success: false, error: errorInfo };
     };
 
@@ -864,19 +847,19 @@ try {
     const processUrlWithRateLimit = async (url, index, total) => {
         const domain = extractDomain(url);
         const queue = domainQueues.get(domain);
-        
+
         return queue(async () => {
             /**
              * Implement delay for same domain requests
              */
             const lastRequestTime = domainLastRequest.get(domain) || 0;
             const timeSinceLastRequest = Date.now() - lastRequestTime;
-            
+
             if (timeSinceLastRequest < delayBetweenRequests) {
                 const delayNeeded = delayBetweenRequests - timeSinceLastRequest;
                 await new Promise(resolve => setTimeout(resolve, delayNeeded));
             }
-            
+
             domainLastRequest.set(domain, Date.now());
             return processUrl(url, index, total);
         });
@@ -887,19 +870,19 @@ try {
      */
     console.log(`\x1b[36mProcessing ${urls.length} URLs across ${urlsByDomain.size} domains\x1b[0m`);
     console.log(`\x1b[36mRate limiting: max ${maxConcurrentPerDomain} concurrent per domain, ${delayBetweenRequests}ms delay\x1b[0m`);
-    
+
     let results;
     if (enableConcurrency && urls.length > 1) {
         /**
          * Process URLs with domain-aware rate limiting
          */
         console.log(`\x1b[36mUsing domain-aware rate limiting with global concurrency: ${concurrency}\x1b[0m`);
-        
+
         const globalLimit = pLimit(concurrency);
-        const promises = urls.map((url, index) => 
+        const promises = urls.map((url, index) =>
             globalLimit(() => processUrlWithRateLimit(url, index + 1, urls.length))
         );
-        
+
         results = await Promise.allSettled(promises);
     } else {
         /**
@@ -912,13 +895,13 @@ try {
         }
         results = allResults;
     }
-    
+
     /**
      * Report processing results
      */
     const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
     const failed = results.length - successful;
-    
+
     console.log(`\x1b[32mProcessing completed!\x1b[0m`);
     console.log(`✅ Successful: ${successful}`);
     if (failed > 0) {
@@ -932,7 +915,7 @@ try {
     console.error('Error type:', error.constructor.name);
     console.error('Message:', error.message);
     console.error('Stack trace:', error.stack);
-    
+
     await cleanup();
     process.exit(1);
 }
@@ -964,35 +947,35 @@ async function generateHtmlReport(url, results, screenshotRelativePath, locale, 
     if (!isValidUrl(url)) {
         throw new Error('Invalid URL provided to generateHtmlReport');
     }
-    
+
     if (!results || typeof results !== 'object') {
         throw new Error('Invalid results object provided to generateHtmlReport');
     }
-    
+
     /**
      * Validate screenshot path to prevent XSS and path traversal
      */
     if (screenshotRelativePath !== null && typeof screenshotRelativePath !== 'string') {
         throw new Error('Invalid screenshot path provided to generateHtmlReport');
     }
-    
+
     if (screenshotRelativePath && (screenshotRelativePath.includes('..') || screenshotRelativePath.startsWith('/'))) {
         throw new Error('Screenshot path contains invalid characters or path traversal attempts');
     }
-    
+
     if (!isValidString(locale)) {
         throw new Error('Invalid locale provided to generateHtmlReport');
     }
-    
+
     if (!isValidString(templatePath)) {
         throw new Error('Invalid template path provided to generateHtmlReport');
     }
-    
+
     if (!isValidString(stylesPath)) {
         throw new Error('Invalid styles path provided to generateHtmlReport');
     }
     const translations = TRANSLATIONS[locale] || TRANSLATIONS.en;
-    
+
     /**
      * Translates a key based on the current locale
      * @param {string} key - Translation key
@@ -1001,8 +984,8 @@ async function generateHtmlReport(url, results, screenshotRelativePath, locale, 
      */
     const translate = (key, subkey) => {
         if (subkey) {
-            return (Object.hasOwn(translations, key) && translations[key] && Object.hasOwn(translations[key], subkey)) 
-                ? translations[key][subkey] 
+            return (Object.hasOwn(translations, key) && translations[key] && Object.hasOwn(translations[key], subkey))
+                ? translations[key][subkey]
                 : 'Translation missing';
         }
         return Object.hasOwn(translations, key) ? translations[key] : 'Translation missing';
@@ -1128,7 +1111,7 @@ async function generateHtmlReport(url, results, screenshotRelativePath, locale, 
     /**
      * Generate screenshot content with external file reference
      */
-    const screenshotContent = screenshotRelativePath 
+    const screenshotContent = screenshotRelativePath
         ? `<img src="${escapeHtml(screenshotRelativePath)}" alt="${escapeHtml(translate('labelImgAlt'))}" loading="lazy">`
         : '<div class="no-screenshot">Screenshot disabled for memory optimization</div>';
 

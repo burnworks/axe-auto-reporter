@@ -9,36 +9,69 @@ import fs from 'fs/promises';
 import path from 'path';
 import minimist from 'minimist';
 import config from './config.mjs';
+import { generateBaseFilename } from './utils/filename.mjs';
 
-// 翻訳データ
 const translations = {
     ja: {
         pageTitle: 'アクセシビリティ試験結果サマリー',
-        labelImpact: '発見された問題点',
+        labelImpact: '問題発生率',
+        globalTotalLabel: '問題総数:',
+        globalTotalUnit: '件',
+        totalPagesLabel: '試験対象:',
+        totalPagesUnit: 'ページ',
+        impactDataText: 'のページで発見',
         impactData: {
             minor: '軽度',
             moderate: '中程度',
             serious: '深刻',
             critical: '重大',
+            total: '合計',
         },
+        sortBy: {
+            minor: '軽度の発生件数でソート',
+            moderate: '中程度の発生件数でソート',
+            serious: '深刻の発生件数でソート',
+            critical: '重大の発生件数でソート',
+            total: '合計発生件数でソート',
+        },
+        labelSummaryTable: '試験結果一覧',
+        labelAnyIssue: '何らかの問題',
+        unknownUrl: 'URL 不明',
+        linkToDetailReport: '「{url}」の詳細レポートを開く',
+        linkToActualPage: '実際のページ（{url}）を別窓で開く',
     },
     en: {
-        pageTitle: 'Accessibility Audit Summary',
-        labelImpact: 'Identified Issues',
+        pageTitle: 'Accessibility Test Results Summary',
+        labelImpact: 'Issue Detection Rate',
+        globalTotalLabel: 'Total Issues:',
+        globalTotalUnit: 'issues',
+        totalPagesLabel: 'Pages Tested:',
+        totalPagesUnit: 'pages',
+        impactDataText: 'of pages have issues',
         impactData: {
             minor: 'Minor',
             moderate: 'Moderate',
             serious: 'Serious',
             critical: 'Critical',
+            total: 'Total',
         },
+        sortBy: {
+            minor: 'Sort by minor issues',
+            moderate: 'Sort by moderate issues',
+            serious: 'Sort by serious issues',
+            critical: 'Sort by critical issues',
+            total: 'Sort by total issues',
+        },
+        labelSummaryTable: 'Test Results',
+        labelAnyIssue: 'Any Issues',
+        unknownUrl: 'URL Unknown',
+        linkToDetailReport: 'Open detailed report for "{url}"',
+        linkToActualPage: 'Open actual page ({url}) in new window',
     }
-    // 他言語の翻訳が必要な場合は追加
 };
 
-// 言語設定を config.locale から取得（デフォルトは 'ja'で、ja / en 以外には未対応）
 const LANGUAGE = ['ja', 'en'].includes(config.locale) ? config.locale : 'ja';
 
-// 翻訳関数
 const translate = (key, subKey) => {
     const keys = translations[LANGUAGE] || translations.ja;
 
@@ -59,22 +92,17 @@ const translate = (key, subKey) => {
     }
 };
 
-// コマンドライン引数の解析
 export const parseArgs = () => {
     const args = process.argv.slice(2);
 
-    // minimist でパース
     const parsed = minimist(args, {
         string: ['path']
     });
-
-    // --path のみを想定しているので、そこだけ抽出
     return {
         path: parsed.path
     };
 };
 
-// HTML escape
 const escapeHtml = unsafe => (
     unsafe
         .replace(/&/g, '&amp;')
@@ -85,9 +113,10 @@ const escapeHtml = unsafe => (
         .replace(/\n/g, '<br>')
 );
 
-// メイン関数
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILES = 1000;
+
 const buildSummary = async () => {
-    // --path の値を取得
     const { path: basePath } = parseArgs();
 
     if (!basePath) {
@@ -95,9 +124,16 @@ const buildSummary = async () => {
         process.exit(1);
     }
 
-    const jsonDir = path.join(basePath, 'json');
+    const normalizedBasePath = path.resolve(basePath);
+    const allowedDir = path.resolve(process.cwd());
+    
+    if (!normalizedBasePath.startsWith(allowedDir)) {
+        console.error('Error: Specified path is outside the allowed directory.');
+        process.exit(1);
+    }
 
-    // JSON ディレクトリの存在確認
+    const jsonDir = path.join(normalizedBasePath, 'json');
+
     try {
         const stat = await fs.stat(jsonDir);
         if (!stat.isDirectory()) {
@@ -109,7 +145,6 @@ const buildSummary = async () => {
         process.exit(1);
     }
 
-    // JSON ファイルの読み込み
     let files;
     try {
         files = await fs.readdir(jsonDir);
@@ -123,27 +158,41 @@ const buildSummary = async () => {
     if (jsonFiles.length === 0) {
         console.warn(`Warning: No JSON files found in ${jsonDir}.`);
     }
+    
+    if (jsonFiles.length > MAX_FILES) {
+        console.warn(`Warning: Processing ${jsonFiles.length} files exceeds recommended limit (${MAX_FILES}). Performance may be affected.`);
+    }
 
-    // Sanitize file name
-    const sanitizeFilenamePart = (str) => str.replace(/[^a-zA-Z0-9\-_.]/g, '_');
 
     const tableRows = [];
+    const globalStats = {
+        minor: 0,
+        moderate: 0,
+        serious: 0,
+        critical: 0
+    };
+    const pageStats = [];
 
     for (const file of jsonFiles) {
         const filePath = path.join(jsonDir, file);
         let data;
         try {
+            const stats = await fs.stat(filePath);
+            if (stats.size > MAX_FILE_SIZE) {
+                console.warn(`Warning: File ${file} is too large (${stats.size} bytes). Maximum allowed: ${MAX_FILE_SIZE} bytes.`);
+                continue;
+            }
+            
             const content = await fs.readFile(filePath, 'utf-8');
             data = JSON.parse(content);
         } catch (err) {
             console.error(`Error: Failed to read or parse ${filePath}.`, err);
-            continue; // 次のファイルに進む
+            continue;
         }
 
-        const url = data.url || 'URL 不明';
+        const url = data.url || translate('unknownUrl');
         const violations = data.violations || [];
 
-        // impactCounts の初期化
         const impactCounts = {
             minor: 0,
             moderate: 0,
@@ -153,58 +202,142 @@ const buildSummary = async () => {
 
         for (const violation of violations) {
             for (const node of violation.nodes) {
-                if (impactCounts.hasOwnProperty(node.impact)) {
+                if (Object.hasOwn(impactCounts, node.impact)) {
                     impactCounts[node.impact]++;
                 }
             }
         }
 
-        // impactListHtml の生成
-        const impactListHtml = Object.entries(impactCounts).map(([impact, count]) => `
-                <li>
-                    <div class="violationFilterBtn" for="filter-${impact}">
-                        <span class="violationLabel ${impact}">${translate('impactData', impact)}</span>
-                        <span class="violationFilterNum">${count}</span>
-                    </div>
-                </li>
-        `).join('');
 
-        // レポートHTMLへのリンク用に URL からファイル名を生成
-        const parsedURL = new URL(url);
-        const domain = parsedURL.hostname;
-        const pathName = sanitizeFilenamePart(parsedURL.pathname.slice(1).replace(/\/$/g, ''));
-        const queryString = sanitizeFilenamePart(parsedURL.search.slice(1));
-        const baseFilename = `${domain}${pathName ? `_${pathName}` : ''}${queryString ? `_${queryString}` : ''}`;
+        let baseFilename;
+        try {
+            baseFilename = generateBaseFilename(url);
+        } catch (error) {
+            console.warn(`Failed to generate filename for URL: ${url}`, error);
+            try {
+                baseFilename = 'invalid_url_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+            } catch (randomError) {
+                baseFilename = 'invalid_url_' + Date.now() + '_fallback';
+            }
+        }
 
-        // テーブル行の追加
+        Object.keys(impactCounts).forEach(impact => {
+            globalStats[impact] += impactCounts[impact];
+        });
+
+        const totalIssues = Object.values(impactCounts).reduce((a, b) => a + b, 0);
+        pageStats.push({
+            url,
+            baseFilename,
+            ...impactCounts,
+            total: totalIssues
+        });
+
         tableRows.push(`
-        <tr>
+        <tr data-minor="${impactCounts.minor}" data-moderate="${impactCounts.moderate}" data-serious="${impactCounts.serious}" data-critical="${impactCounts.critical}" data-total="${totalIssues}">
             <th scope="row">
                 <div class="report-link">
-                    <a href="../html/${escapeHtml(baseFilename)}.html" title="「${escapeHtml(url)}」の詳細レポートを開く" aria-label="「${escapeHtml(url)}」の詳細レポートを開く">${escapeHtml(url)}</a>
-                    <a class="report-link-ex" href="${escapeHtml(url)}" target="_blank" title="実際のページ（${escapeHtml(url)}）を別窓で開く" aria-label="実際のページ（${escapeHtml(url)}）を別窓で開く">
+                    <a href="../html/${escapeHtml(baseFilename)}.html" title="${translate('linkToDetailReport').replace('{url}', escapeHtml(url))}" aria-label="${translate('linkToDetailReport').replace('{url}', escapeHtml(url))}">${escapeHtml(url)}</a>
+                    <a class="report-link-ex" href="${escapeHtml(url)}" target="_blank" title="${translate('linkToActualPage').replace('{url}', escapeHtml(url))}" aria-label="${translate('linkToActualPage').replace('{url}', escapeHtml(url))}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="report-link-ex-icon" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                         </svg>
                     </a>
                 </div>
             </th>
-            <td>
-                <ul class="violation-count-summary">
-                    ${impactListHtml}
-                </ul>
-            </td>
+            <td class="impact-cell minor">${impactCounts.minor}</td>
+            <td class="impact-cell moderate">${impactCounts.moderate}</td>
+            <td class="impact-cell serious">${impactCounts.serious}</td>
+            <td class="impact-cell critical">${impactCounts.critical}</td>
+            <td class="total-cell">${totalIssues}</td>
         </tr>
         `);
     }
 
-    // 完成したテーブルの生成
+    const totalPages = pageStats.length;
+    const globalTotal = Object.values(globalStats).reduce((a, b) => a + b, 0);
+
+    const issueOccurrenceRates = {
+        minor: 0,
+        moderate: 0,
+        serious: 0,
+        critical: 0,
+        any: 0
+    };
+
+    if (totalPages > 0) {
+        let pagesWithMinor = 0;
+        let pagesWithModerate = 0;
+        let pagesWithSerious = 0;
+        let pagesWithCritical = 0;
+        let pagesWithAnyIssue = 0;
+
+        pageStats.forEach(page => {
+            if (page.minor > 0) pagesWithMinor++;
+            if (page.moderate > 0) pagesWithModerate++;
+            if (page.serious > 0) pagesWithSerious++;
+            if (page.critical > 0) pagesWithCritical++;
+            if (page.total > 0) pagesWithAnyIssue++;
+        });
+
+        issueOccurrenceRates.minor = Math.round((pagesWithMinor / totalPages) * 100);
+        issueOccurrenceRates.moderate = Math.round((pagesWithModerate / totalPages) * 100);
+        issueOccurrenceRates.serious = Math.round((pagesWithSerious / totalPages) * 100);
+        issueOccurrenceRates.critical = Math.round((pagesWithCritical / totalPages) * 100);
+        issueOccurrenceRates.any = Math.round((pagesWithAnyIssue / totalPages) * 100);
+    }
+
+
     const tableHtml = `
-    <table>
+    <table id="resultsTable">
         <thead>
             <tr>
                 <th scope="col">URL</th>
-                <th scope="col">${translate('labelImpact')}</th>
+                <th scope="col" class="sortable" data-sort="minor">
+                    ${translate('impactData', 'minor')}
+                    <button class="sort-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" role="img" aria-label="${translate('sortBy', 'minor')}">
+                            <title>${translate('sortBy', 'minor')}</title>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                        </svg>
+                    </button>
+                </th>
+                <th scope="col" class="sortable" data-sort="moderate">
+                    ${translate('impactData', 'moderate')}
+                    <button class="sort-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" role="img" aria-label="${translate('sortBy', 'moderate')}">
+                            <title>${translate('sortBy', 'moderate')}</title>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                        </svg>
+                    </button>
+                </th>
+                <th scope="col" class="sortable" data-sort="serious">
+                    ${translate('impactData', 'serious')}
+                    <button class="sort-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" role="img" aria-label="${translate('sortBy', 'serious')}">
+                            <title>${translate('sortBy', 'serious')}</title>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                        </svg>
+                    </button>
+                </th>
+                <th scope="col" class="sortable" data-sort="critical">
+                    ${translate('impactData', 'critical')}
+                    <button class="sort-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" role="img" aria-label="${translate('sortBy', 'critical')}">
+                            <title>${translate('sortBy', 'critical')}</title>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                        </svg>
+                    </button>
+                </th>
+                <th scope="col" class="sortable" data-sort="total">
+                    ${translate('impactData', 'total')}
+                    <button class="sort-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" role="img" aria-label="${translate('sortBy', 'total')}">
+                            <title>${translate('sortBy', 'total')}</title>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                        </svg>
+                    </button>
+                </th>
             </tr>
         </thead>
         <tbody>
@@ -213,17 +346,23 @@ const buildSummary = async () => {
     </table>
     `;
 
-    // styles.css の読み込み
     let styleContent = '';
     try {
-        const stylePath = path.join(process.cwd(), 'template', 'styles.css');
-        styleContent = await fs.readFile(stylePath, 'utf-8');
+        const templateDir = path.join(process.cwd(), 'template');
+        const stylePath = path.join(templateDir, 'styles.css');
+        const normalizedStylePath = path.resolve(stylePath);
+        const allowedTemplateDir = path.resolve(templateDir);
+        
+        if (!normalizedStylePath.startsWith(allowedTemplateDir)) {
+            throw new Error('Style path is outside allowed template directory');
+        }
+        
+        styleContent = await fs.readFile(normalizedStylePath, 'utf-8');
     } catch (error) {
         console.warn('Warning: Could not load styles.css.', error);
         styleContent = `/* Could not load styles.css */`;
     }
 
-    // 完全な HTML の生成
     const fullHtml = `
     <!DOCTYPE html>
     <html lang="${LANGUAGE}">
@@ -240,32 +379,133 @@ const buildSummary = async () => {
                 <h1>${translate('pageTitle')}</h1>
             </header>
             <main>
-                <div class="summary-table">
-                    <div class="overflow-table" tabindex="0">
-                        ${tableHtml}
+                <section class="stats-summary">
+                    <h2 class="stats-summary-header">${translate('labelImpact')} <span>（${translate('globalTotalLabel')} ${globalTotal} ${translate('globalTotalUnit')} / ${translate('totalPagesLabel')} ${totalPages} ${translate('totalPagesUnit')}）</span></h2>
+                    <div class="stats-cards">
+                        <div class="stat-card critical">
+                            <h3>${translate('impactData', 'critical')}</h3>
+                            <div class="stat-number">${issueOccurrenceRates.critical}<span>%</span></div>
+                            <div class="stat-label">${translate('impactDataText')}</div>
+                        </div>
+                        <div class="stat-card serious">
+                            <h3>${translate('impactData', 'serious')}</h3>
+                            <div class="stat-number">${issueOccurrenceRates.serious}<span>%</span></div>
+                            <div class="stat-label">${translate('impactDataText')}</div>
+                        </div>
+                        <div class="stat-card moderate">
+                            <h3>${translate('impactData', 'moderate')}</h3>
+                            <div class="stat-number">${issueOccurrenceRates.moderate}<span>%</span></div>
+                            <div class="stat-label">${translate('impactDataText')}</div>
+                        </div>
+                        <div class="stat-card minor">
+                            <h3>${translate('impactData', 'minor')}</h3>
+                            <div class="stat-number">${issueOccurrenceRates.minor}<span>%</span></div>
+                            <div class="stat-label">${translate('impactDataText')}</div>
+                        </div>
+                        <div class="stat-card any">
+                            <h3>${translate('labelAnyIssue')}</h3>
+                            <div class="stat-number">${issueOccurrenceRates.any}<span>%</span></div>
+                            <div class="stat-label">${translate('impactDataText')}</div>
+                        </div>
                     </div>
-                </div>
+                </section>
+                
+                <section class="results-section">
+                    <div class="summary-table">
+                    <h2 class="results-section-header">${translate('labelSummaryTable')}</h2>
+                        <div class="overflow-table" tabindex="0">
+                            ${tableHtml}
+                        </div>
+                    </div>
+                </section>
             </main>
             <footer>
                 <div>
                     <a href="https://github.com/burnworks/axe-auto-reporter" target="_blank">axe-auto-reporter</a> by @burnworks
                 </div>
             </footer>
+            
+            <script>
+            
+            let currentSort = { column: null, direction: 'asc' };
+            
+            function sortTable(column) {
+                const table = document.getElementById('resultsTable');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                
+                if (currentSort.column === column) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = column;
+                    currentSort.direction = 'desc';
+                }
+                
+                rows.sort((a, b) => {
+                    const aVal = parseInt(a.getAttribute('data-' + column)) || 0;
+                    const bVal = parseInt(b.getAttribute('data-' + column)) || 0;
+                    
+                    if (currentSort.direction === 'asc') {
+                        return aVal - bVal;
+                    } else {
+                        return bVal - aVal;
+                    }
+                });
+                
+                if (tbody.replaceChildren) {
+                    tbody.replaceChildren(...rows);
+                } else {
+                    const fragment = document.createDocumentFragment();
+                    rows.forEach(row => fragment.appendChild(row));
+                    tbody.innerHTML = '';
+                    tbody.appendChild(fragment);
+                }
+                
+                document.querySelectorAll('.sortable').forEach(th => {
+                    th.classList.remove('asc', 'desc');
+                });
+                
+                const activeHeader = document.querySelector('[data-sort="' + column + '"]');
+                activeHeader.classList.add(currentSort.direction);
+            }
+            
+            document.querySelectorAll('.sortable .sort-icon').forEach(button => {
+                button.addEventListener('click', () => {
+                    const th = button.closest('.sortable');
+                    const column = th.getAttribute('data-sort');
+                    sortTable(column);
+                });
+                
+                button.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        const th = button.closest('.sortable');
+                        const column = th.getAttribute('data-sort');
+                        sortTable(column);
+                    }
+                });
+            });
+            </script>
         </body>
     </html>
     `;
 
-    // summary ディレクトリの作成
-    const summaryDir = path.join(basePath, 'summary');
+    const summaryDir = path.join(normalizedBasePath, 'summary');
+    const normalizedSummaryDir = path.resolve(summaryDir);
+    
+    if (!normalizedSummaryDir.startsWith(allowedDir)) {
+        console.error('Error: Summary directory path is outside allowed directory.');
+        process.exit(1);
+    }
+    
     try {
-        await fs.mkdir(summaryDir, { recursive: true });
+        await fs.mkdir(normalizedSummaryDir, { recursive: true });
     } catch (err) {
-        console.error(`Error: Failed to create directory ${summaryDir}.`, err);
+        console.error(`Error: Failed to create directory ${normalizedSummaryDir}.`, err);
         process.exit(1);
     }
 
-    // index.html の書き出し
-    const outputPath = path.join(summaryDir, 'index.html');
+    const outputPath = path.join(normalizedSummaryDir, 'index.html');
     try {
         await fs.writeFile(outputPath, fullHtml, 'utf-8');
         console.log(`Summary page generated at ${outputPath}`);
@@ -275,5 +515,4 @@ const buildSummary = async () => {
     }
 }
 
-// スクリプトの実行
 buildSummary();
