@@ -1,6 +1,6 @@
 /**
  * @fileoverview Automated accessibility testing script using axe-core and Puppeteer
- * @version 3.1.0
+ * @version 3.1.1
  * @author burnworks
  * @requires node >=22.0.0
  */
@@ -512,18 +512,20 @@ try {
         viewport,
         concurrency,
         enableConcurrency,
-        screenshotFormat = 'jpeg',
-        screenshotQuality = 80,
-        enableScreenshots = true,
-        outputDirectory = 'results',
-        templatePath = 'template/template.html',
-        stylesPath = 'template/styles.css',
-        jsonIndentation = 2,
-        navigationTimeout = 30000,
-        allowedDomains = [],
-        blockedDomains = ['localhost', '127.0.0.1', '0.0.0.0', '::1'],
-        enableSandbox = true,
-        maxPageSize = 50 * 1024 * 1024
+        screenshotFormat,
+        screenshotQuality,
+        enableScreenshots,
+        outputDirectory,
+        templatePath,
+        stylesPath,
+        jsonIndentation,
+        navigationTimeout,
+        allowedDomains,
+        blockedDomains,
+        enableSandbox,
+        maxPageSize,
+        maxConcurrentPerDomain,
+        delayBetweenRequests
     } = config;
 
     /**
@@ -829,7 +831,6 @@ try {
     /**
      * Create domain-specific queues for rate limiting
      */
-    const { maxConcurrentPerDomain, delayBetweenRequests } = config;
     const domainQueues = new Map();
     const domainLastRequest = new Map();
 
