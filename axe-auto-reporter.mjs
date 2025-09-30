@@ -10,9 +10,11 @@ import puppeteer from 'puppeteer';
 import { loadPage } from '@axe-core/puppeteer';
 import AXELOCALES_JA from 'axe-core/locales/ja.json' with { type: 'json' };
 import path from 'path';
+import minimist from 'minimist';
 import pLimit from 'p-limit';
 import { isIP } from 'net';
 import config from './config.mjs';
+import { CsvReportBuilder } from './utils/csv-report.mjs';
 import { generateBaseFilename } from './utils/filename.mjs';
 
 
@@ -471,8 +473,6 @@ const TRANSLATIONS = Object.freeze({
     },
 });
 
-initializeTemplateCache();
-
 /**
  * Escapes HTML special characters to prevent XSS
  * @param {any} unsafe - Input to escape (will be converted to string)
@@ -492,6 +492,27 @@ const escapeHtml = (unsafe) => {
         .replace(/'/g, '&#039;')
         .replace(/\n/g, '<br>');
 };
+
+/**
+ * Parses CLI arguments to determine report mode.
+ * @returns {{reportOutputMode: 'html' | 'csv'}}
+ */
+const parseCliOptions = () => {
+    const args = minimist(process.argv.slice(2), { string: ['mode'] });
+    const rawMode = Array.isArray(args.mode) ? args.mode.at(-1) : args.mode;
+    const normalized = typeof rawMode === 'string' ? rawMode.trim().toLowerCase() : '';
+
+    if (normalized && normalized !== 'csv') {
+        console.warn(`Unknown --mode option "${rawMode}". Falling back to HTML report output.`);
+    }
+
+    return { reportOutputMode: normalized === 'csv' ? 'csv' : 'html' };
+};
+
+const { reportOutputMode } = parseCliOptions();
+
+let csvReportBuilder = null;
+let csvOutputPath = null;
 
 try {
 
@@ -527,6 +548,8 @@ try {
         maxConcurrentPerDomain,
         delayBetweenRequests
     } = config;
+
+    const impactMap = (TRANSLATIONS[locale] || TRANSLATIONS.en).impactData || {};
 
     /**
      * Puppeteer launch arguments with memory optimizations and security settings
@@ -564,8 +587,10 @@ try {
 
     const normalizedPath = path.resolve(urlList);
     const currentDir = path.resolve('.');
+    const relativePath = path.relative(currentDir, normalizedPath);
+    const isOutsideWorkspace = relativePath.startsWith('..') || path.isAbsolute(relativePath);
 
-    if (!normalizedPath.startsWith(currentDir)) {
+    if (isOutsideWorkspace) {
         throw new Error('URL list file path must be within current directory');
     }
 
@@ -605,6 +630,10 @@ try {
 
     console.log(`\x1b[36mFound ${urls.length} valid URLs to process\x1b[0m`);
 
+    if (reportOutputMode === 'csv') {
+        console.log('\x1b[36mCSV report mode enabled. HTML reports and screenshots are skipped.\x1b[0m');
+    }
+
     if (enableSandbox) {
         console.log('\x1b[32mSecurity: Browser sandbox enabled\x1b[0m');
     } else {
@@ -621,6 +650,10 @@ try {
 
     if (maxPageSize > 0) {
         console.log(`\x1b[32mSecurity: Page size limit set to ${Math.round(maxPageSize / 1024 / 1024)}MB\x1b[0m`);
+    }
+
+    if (reportOutputMode !== 'csv') {
+        await initializeTemplateCache();
     }
 
     await ensureDirectoryExists(outputDirectory);
@@ -640,11 +673,22 @@ try {
     const jsonFolder = path.join(folderName, 'json');
     const htmlFolder = path.join(folderName, 'html');
     const screenshotFolder = path.join(htmlFolder, 'images');
-    await Promise.all([
-        ensureDirectoryExists(jsonFolder),
-        ensureDirectoryExists(htmlFolder),
-        ensureDirectoryExists(screenshotFolder)
-    ]);
+    const directoryTasks = [ensureDirectoryExists(jsonFolder)];
+    if (reportOutputMode !== 'csv') {
+        directoryTasks.push(
+            ensureDirectoryExists(htmlFolder),
+            ensureDirectoryExists(screenshotFolder)
+        );
+    }
+    await Promise.all(directoryTasks);
+
+    if (reportOutputMode === 'csv') {
+        csvOutputPath = path.join(folderName, 'report.csv');
+        csvReportBuilder = new CsvReportBuilder({
+            filePath: csvOutputPath,
+            impactLabel: (impact) => impact ? (impactMap[impact] || impact) : ''
+        });
+    }
 
 
     const processUrl = async (url, index, total) => {
@@ -663,7 +707,12 @@ try {
         try {
             ({ page, axeBuilder, eventHandlers } = await initializePage(url, index, total, browser, navigationTimeout, maxPageSize));
 
-            const screenshotBuffer = await captureScreenshot(page, enableScreenshots, screenshotFormat, screenshotQuality);
+            const screenshotBuffer = await captureScreenshot(
+                page,
+                enableScreenshots && reportOutputMode !== 'csv',
+                screenshotFormat,
+                screenshotQuality
+            );
 
             const results = await runAccessibilityTest(axeBuilder, localeData, tags);
 
@@ -736,7 +785,7 @@ try {
         }
 
         let screenshotRelativePath = null;
-        if (screenshotBuffer) {
+        if (screenshotBuffer && reportOutputMode !== 'csv') {
             const screenshotExtension = screenshotFormat === 'png' ? 'png' : (screenshotFormat === 'webp' ? 'webp' : 'jpg');
             const screenshotFilename = path.join(screenshotFolder, `${baseFilename}.${screenshotExtension}`);
             await writeFile(screenshotFilename, screenshotBuffer);
@@ -747,14 +796,20 @@ try {
         const jsonData = JSON.stringify(results, null, jsonIndentation);
         await writeFile(jsonFilename, jsonData, { encoding: 'utf-8', flag: 'w' });
 
-        const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
-        const htmlContent = await generateHtmlReport(url, results, screenshotRelativePath, locale, templatePath, stylesPath);
-
-        if (!isValidString(htmlContent)) {
-            throw new Error('Failed to generate valid HTML content');
+        if (csvReportBuilder) {
+            await csvReportBuilder.addViolations({ url, violations: results.violations });
         }
 
-        await writeFile(htmlFilename, htmlContent, { encoding: 'utf-8', flag: 'w' });
+        if (reportOutputMode !== 'csv') {
+            const htmlFilename = path.join(htmlFolder, `${baseFilename}.html`);
+            const htmlContent = await generateHtmlReport(url, results, screenshotRelativePath, locale, templatePath, stylesPath);
+
+            if (!isValidString(htmlContent)) {
+                throw new Error('Failed to generate valid HTML content');
+            }
+
+            await writeFile(htmlFilename, htmlContent, { encoding: 'utf-8', flag: 'w' });
+        }
     };
 
     const cleanupMemory = async (results, index) => {
@@ -909,6 +964,11 @@ try {
         console.log(`❌ Failed: ${failed}`);
     }
 
+    if (csvReportBuilder) {
+        await csvReportBuilder.close();
+        console.log(`📄 CSV report saved: ${csvOutputPath}`);
+    }
+
     await cleanup();
     console.log('\x1b[32mAll URLs processed successfully!\x1b[0m');
 } catch (error) {
@@ -916,6 +976,13 @@ try {
     console.error('Error type:', error.constructor.name);
     console.error('Message:', error.message);
     console.error('Stack trace:', error.stack);
+
+    if (csvReportBuilder) {
+        try {
+            await csvReportBuilder.close();
+        } catch {
+        }
+    }
 
     await cleanup();
     process.exit(1);

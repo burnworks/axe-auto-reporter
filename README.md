@@ -43,6 +43,25 @@ When you run the test, a `results` directory will be created, and the test resul
 テストは実行した日時ごとにディレクトリ分けされ、さらに HTML ファイルは `html` ディレクトリに、JSON ファイルは `json` ディレクトリに保存されます。  
 JSON ファイルにはテスト結果のすべてが入っていますので、これを使用して他のデータを作ったりすることもできます。
 
+#### CSV report mode
+
+To export CSV reports instead of HTML, you can execute:
+
+HTML レポートの代わりに CSV 形式のレポートを 1 ファイルで取得したい場合は、次のように実行します。
+
+```sh
+node axe-auto-reporter.mjs --mode csv
+```
+or
+
+```sh
+npm run checkcsv
+```
+
+This creates the usual JSON files and additionally writes `report.csv` in each run directory. HTML reports and screenshots are skipped in this mode.
+
+通常どおり JSON ファイルが作成され、加えて結果ディレクトリ直下に `report.csv` が保存されます。このモードでは HTML レポートとスクリーンショットの出力はスキップされます。
+
 ## Configuration
 
 The configuration file is config.mjs. You can set the following items:
