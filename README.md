@@ -99,6 +99,12 @@ Tailwind CSS は HTML テンプレートのスタイルシートを生成する�
 
 ***
 
+## 関連リポジトリ
+
+この axe-auto-reporter をベースに、ブラウザで操作、閲覧可能なダッシュボードツールを公開しています。
+
+- [burnworks/axe-auto-reporter-web: An automated accessibility test report dashboard using @axe-core/puppeteer.](https://github.com/burnworks/axe-auto-reporter-web)
+
 ## アクセシビリティチェックをご希望の企業様へ
 
 何らかの理由で Node.js 実行環境が構築できないが本スクリプトを使用したアクセシビリティチェックを自社サイトに対して実行したいとお考えの企業様。
